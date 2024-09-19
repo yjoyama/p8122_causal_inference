@@ -21,13 +21,13 @@ for (i in 1:ncol(Abold)) {
   A_tilde <- Abold[, i]
   rdist[i] <- mean(Y[A_tilde == 1]) - mean(Y[A_tilde == 0])
 }
-rdist
-hist(rdist)
+rdist # T stats
+hist(rdist) # the distribution of T stats under the null
 
 # p-value
 pval <- mean(rdist >= T_stat)
 pval
-quant <- quantile(rdist,probs = 1-pval)
+quant <- quantile(rdist, probs = 1-pval)
 hist(rdist)
 abline(v = quant,col="red")
 

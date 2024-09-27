@@ -1,0 +1,12 @@
+---
+title: "Homework2"
+author: "Yuki Joyama"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T, message = F, warning = F)
+
+library(tidyverse)
+library(ggplot2)
+```

@@ -135,3 +135,5 @@ $P(T(A, Y) \geq T_{obs} | Y_i^1-Y_i^0 = 0) = \frac{\sum I(T(A, Y) \geq T_{obs})}
 p_val = sum(rdist >= T_obs) / length(rdist)
 ```
 The exact p-value is `r format(p_val, scientific = FALSE)`.
+
+10. Under $\alpha=0.05$, the exact p-value < 0.05 suggests that the observed test statistic is unlikely to have occurred under the sharp null hypothesis. Therefore, we reject the null hypothesis. We can conclude that exposure to bright light at night compared to darkness at night has a causal effect on changes in body mass among mice over the 8 weeks of the experiment.

@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = T, message = F, warning = F)
 # libraries
 library(tidyverse)
 library(ggplot2)
+library(perm)
 
 # setup plot theme
 theme_set(
@@ -41,29 +42,63 @@ summary(df2)
 ```
 
 3. I will redefine the variables using generic names as follows:  
-- LL group: $A=1$  
-- LD group: $A=0$  
+- LL group: $A=1$
+- LD group: $A=0$
 - BMGain: $Y_{obs}$  
-- Number of mice in LL group: $N_1$  
-- Number of mice in LD group: $N_0$  
 ```{r}
 # edit df2 accordingly
 df2 = df2 |>
   mutate(A = ifelse(Light == "LL", 1, 0), # add variable A and input 1 for LL, 0 for LD group
          Y_obs = BMGain) |> # add new outcome column
   select(-Light, -BMGain)
-
-n1 = sum(df2$A == 1) # number of mice in LL
-n0 = sum(df2$A == 0) # number of mice in LL
 ```
-To evaluate the causal effect of light at night on weight gain, 
+
+To evaluate the causal effect of light at night on weight gain, I will need the following quantities:  
+```{r}
+# define/calculate the quantities
+N1 = sum(df2$A == 1) 
+N0 = sum(df2$A == 0) 
+N = N1 + N0 
+Yb_obs1 = df2 |>
+  filter(A == 1) |>
+  summarize(mean_Y_obs = mean(Y_obs)) |>
+  pull(mean_Y_obs)
+Yb_obs0 = df2 |>
+  filter(A == 0) |>
+  summarize(mean_Y_obs = mean(Y_obs)) |>
+  pull(mean_Y_obs)
+```
+- Number of mice in LL group: $N_1=$ `r N1`
+- Number of mice in LD group: $N_0=$ `r N0`
+- Total number of mice in LL and LD group: $N=$ `r N`
+- Mean of the outcome variable for LL group: $\bar{Y}_1^{obs}=$ `r round(Yb_obs1,2)` 
+- Mean of the outcome variable for LD group: $\bar{Y}_0^{obs}=$ `r round(Yb_obs0,2)`  
 
 4. 
-- Mean of the outcome variable for LL group: $\bar{Y}_1^{obs}$  
-- Mean of the outcome variable for LD group: $\bar{Y}_0^{obs}$
+```{r}
+# calculate t_obs
+T_obs = Yb_obs1 - Yb_obs0
+```
+$T_{obs}=\bar{Y}_1^{\text{obs}} - \bar{Y}_0^{\text{obs}}=$ `r round(T_obs,2)`
 
+```{r echo=F}
+A_num = choose(N, N1)
+```
+5. Under the completely randomized experiment where $N1$ and $N0$ are fixed, there are $\binom{N}{N_1}=$ `r format(A_num, scientific = FALSE)` possibilities for $A$.
+```{r}
+# enumerate them in a matrix
+A = chooseMatrix(N, N1)
+```
 
+6. The sharp null hypothesis:  
+$H_0: Y_i^1 = Y_i^0 \quad \text{for all } i$  
+where $Y_i^1$ is the potential outcome for mouse $i$ if they are assigned to $A=1$, and $Y_i^0$ is the potential outcome for mouse $i$ if they are assigned to $A=0$.
+```{r}
+# create df that has the group assignment based on the first row of matrix A
+df3 = df2 
+df3$A = A[1,]  
 
-
-
-
+# calculate t under the first possibility of A, under the sharp null hypothesis
+T_stat = mean(df3$Y_obs[df3$A == 1]) - mean(df3$Y_obs[df3$A == 0])
+```
+Under the sharp null hypothesis, the test statistic under the first row of matrix $A$ is `r round(T_stat,2)`.

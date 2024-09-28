@@ -102,3 +102,23 @@ df3$A = A[1,]
 T_stat = mean(df3$Y_obs[df3$A == 1]) - mean(df3$Y_obs[df3$A == 0])
 ```
 Under the sharp null hypothesis, the test statistic under the first row of matrix $A$ is `r round(T_stat,2)`.
+
+7. I will iterate the process in 6 for all the possibilities of matrix $A$ to obtain the exact randomization distribution for T under the sharp null hypothesis.  
+```{r fig.width=3, fig.height=3}
+# set up df to store T statistic values
+rdist = rep(NA, times = A_num)
+
+# iteration
+for (i in 1:A_num) {
+  df_ite <- df2
+  df_ite$A <- A[i,]
+  rdist[i] <- mean(df_ite$Y_obs[df_ite$A == 1]) - mean(df_ite$Y_obs[df_ite$A == 0])
+}
+
+# plot histogram
+ggplot(data.frame(t_stat = rdist), aes(x = t_stat)) +
+  geom_histogram(binwidth = 0.5, color = "black", fill = "skyblue") +
+  labs(title = "Histogram of T Statistics", x = "T Statistic", y = "Frequency")
+```
+
+

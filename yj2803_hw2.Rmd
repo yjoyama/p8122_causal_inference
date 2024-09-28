@@ -6,7 +6,64 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = T, message = F, warning = F)
+```
 
+```{r}
+# libraries
 library(tidyverse)
 library(ggplot2)
+
+# setup plot theme
+theme_set(
+  theme_bw() +
+    theme(legend.position = "top")
+  )
+
+# import data
+df = read_csv('./data/light.csv') 
 ```
+
+1. I will use boxplot to show the outcome by treatment group.
+```{r fig.width=3, fig.height=3}
+# boxplot
+p1 = ggplot(df, aes(x = Light, y = BMGain)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(x = "Treatment Group", y = "Body Mass Gain")
+p1
+```
+
+2. Here I will subset the data to only consider LD (dark light) and LL (bright light) groups.
+```{r}
+# filter by these two groups
+df2 = df |>
+  filter(Light == 'LL' | Light == 'LD')
+summary(df2)
+```
+
+3. I will redefine the variables using generic names as follows:  
+- LL group: $A=1$  
+- LD group: $A=0$  
+- BMGain: $Y_{obs}$  
+- Number of mice in LL group: $N_1$  
+- Number of mice in LD group: $N_0$  
+```{r}
+# edit df2 accordingly
+df2 = df2 |>
+  mutate(A = ifelse(Light == "LL", 1, 0), # add variable A and input 1 for LL, 0 for LD group
+         Y_obs = BMGain) |> # add new outcome column
+  select(-Light, -BMGain)
+
+n1 = sum(df2$A == 1) # number of mice in LL
+n0 = sum(df2$A == 0) # number of mice in LL
+```
+To evaluate the causal effect of light at night on weight gain, 
+
+4. 
+- Mean of the outcome variable for LL group: $\bar{Y}_1^{obs}$  
+- Mean of the outcome variable for LD group: $\bar{Y}_0^{obs}$
+
+
+
+
+
+

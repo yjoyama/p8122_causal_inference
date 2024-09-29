@@ -41,7 +41,7 @@ df2 = df |>
 summary(df2)
 ```
 
-3. I will redefine the variables using generic names as follows:  
+3. I will redefine the variables using generic names as follows:
 - LL group: $A=1$
 - LD group: $A=0$
 - BMGain: $Y_{obs}$  

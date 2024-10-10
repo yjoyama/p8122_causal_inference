@@ -41,9 +41,9 @@ Y <- rnorm(n,mu_Y, sigma_Y)
 
 
 # 1. Interpret parameters
-$C$: Obesity ($p=1/5$ of the mice are obese at baseline)    
-$A$: Exposure to light  
-$Y$: Glucose outcome such that $Y\sim N(\mu_Y, \sigma)$, where $E(\mu_Y)= f(\beta_0+\beta_1*obesity+\beta_2*light)$, $\beta_0=110, \beta_1=20, \text{ and } \beta_2=-5$   
+$C$: Obesity ($C=1$: obese, $C=0$: not obese)    
+$A$: Exposure to light ($A=1$: bright light, $A=0$: dark light)  
+$Y$: Glucose outcome such that $Y\sim N(\mu_Y, \sigma)$, where $\mu_Y= f(\beta_0+\beta_1*obesity+\beta_2*light)$, $\beta_0=110, \beta_1=20, \text{ and } \beta_2=-5$   
   
 $p$: The probability of a mouse to be obese at baseline. Theoretically, 3.2 out of 16 mice are obese. In the simulation by the above R code, 3 out of 16 mice are set to be obese at baseline.  
 $\theta_0$: The probability for a non-obese mouse ($C=0$) to be exposed to light. $\theta_0=1/2$ means that there's a 50% chance for a non-obese mouse to be exposed to light.   
@@ -60,13 +60,56 @@ Conditional PACE: $E[Y_1|C=c]-E[Y_0|C=c]$
 This holds under consistency, SUTVA, exchangeability, positivity, and NUCA ($Y_a\perp A|C$) assumption.
 
 # 3. g-formula (randomized vs. observational study)
-g-formula for the randomized study:  $E[Ya] = \sum_c E[Y | A = a, C = c] Pr(C = c)=E[Y|A=a]$  
-g-formula for the observational study: $E[Ya] =  \sum_c E[Y |A=a, C = c] Pr(C = c)$ under NUCA.  
-Randomization enforces unconfoundedness. The distribution of $C$ does not depend on $A$, so g-formula simplifies to $E[Y|A=a]$. In an observational study, $A$ is influenced by $C$, so the formula cannot be simplified without accounting for the confounders.   
+g-formula for the randomized study:  $\sum_c E[Y | A = 1, C = c] Pr(C = c) - \sum_c E[Y | A = 0, C = c] Pr(C = c)=E[Y|A=1]-E[Y|A=0]$  
+g-formula for the observational study: $\sum_c E[Y |A=1, C = c] Pr(C = c)-\sum_c E[Y |A=0, C = c] Pr(C = c)$ under NUCA.  
+Randomization enforces unconfoundedness. The distribution of $C$ does not depend on $A$, so g-formula simplifies to $E[Y|A=1]-E[Y|A=0]$. In an observational study, $A$ is influenced by $C$, so the formula cannot be simplified without accounting for the confounders.   
 
 # 4. Estimate and confidence interval of $E[Y|A=1]-E[Y|A=0]$
+I will use the following code to calculate the estimate of $E[Y|A=1]-E[Y|A=0]$:
+```{r}
+# split Y into Y_1 and Y_0
+Y_1 = Y[A==1]
+Y_0 = Y[A==0]
+
+# calculate mean of Y
+mY_1 = mean(Y[A==1])
+mY_0 = mean(Y[A==0])
+
+# calculate the estimate of causal effect
+diff = mY_1 - mY_0
+```
+
+$E[Y|A=1]-E[Y|A=0]=$ `r round(diff,2)`
+
+95% confidence interval can be calculated by $E[Y|A=1]-E[Y|A=0] \pm z \sqrt{\frac{S_1^2}{N_1} + \frac{S_0^2}{N_0}}$, where $z$ is the critical value from the standard normal distribution, $S_1^2$ and $S_0^2$ are the variances of the potential outcomes in $A=1$ and $A=0$ groups, and $N_1$ and $N_0$ are the sizes of $A=1$ and $A=0$ groups.
+```{r}
+# critical value
+z = qnorm(1 - 0.05 / 2)
+
+# size
+n_0 = 8
+n_1 = 8
+
+# variance
+var_0 = var(Y_0)
+var_1 = var(Y_1)
+
+# standard error
+se = sqrt(var_0/n_0 + var_1/n_1)
+
+# 95% CI
+ci_lower = diff - z*se
+ci_upper = diff + z*se
+```
+
+The 95% confidence interval is (`r list(round(ci_lower, 2), round(ci_upper, 2))`).  
+The point estimate suggests that on average, the outcome $Y$ is `r round(-diff,2)` mg/dL lower in bright light group compared to dark light group in the randomized study from previous homework.  
+The 95% confidence interval includes zero, so we cannot rule out the possibility that there is no causal effect between the bright and dark light groups (the result is not statistically significant with 95% confidence).
 
 # 5. Estimate and confidence interval of $E[Y_1]-E[Y_0]$
 
+
+
 # 6. Assumptions of estimate $E[Y_1]−E[Y_0]$ using linear regression
+
 

@@ -60,6 +60,9 @@ Conditional PACE: $E[Y_1|C=c]-E[Y_0|C=c]$
 This holds under consistency, SUTVA, exchangeability, positivity, and NUCA ($Y_a\perp A|C$) assumption.
 
 # 3. g-formula (randomized vs. observational study)
+g-formula for the randomized study:  $E[Ya] = \sum_c E[Y | A = a, C = c] Pr(C = c)=E[Y|A=a]$  
+g-formula for the observational study: $E[Ya] =  \sum_c E[Y |A=a, C = c] Pr(C = c)$ under NUCA.  
+Randomization enforces unconfoundedness. The distribution of $C$ does not depend on $A$, so g-formula simplifies to $E[Y|A=a]$. In an observational study, $A$ is influenced by $C$, so the formula cannot be simplified without accounting for the confounders.   
 
 # 4. Estimate and confidence interval of $E[Y|A=1]-E[Y|A=0]$
 

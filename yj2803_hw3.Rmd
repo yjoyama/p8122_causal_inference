@@ -1,7 +1,10 @@
 ---
 title: "Homework 3"
 author: "Yuki Joyama"
-output: pdf_document
+output: 
+  pdf_document:
+    latex_engine: xelatex
+    extra_dependencies: ["fontspec", "amsmath", "amssymb", "unicode-math"]
 ---
 
 ```{r setup, include=FALSE}
@@ -12,7 +15,6 @@ knitr::opts_chunk$set(echo = T, message = F, warning = F)
 # libraries
 library(tidyverse)
 library(ggplot2)
-library(perm)
 
 # setup plot theme
 theme_set(
@@ -36,4 +38,17 @@ sigma_Y <- 1
 mu_Y <- beta0+beta1*C+beta2*A
 Y <- rnorm(n,mu_Y, sigma_Y)
 ```
+
+
+# 1. Interpret parameters
+
+# 2. PACE
+
+# 3. g-formula (randomized vs. observational study)
+
+# 4. Estimate and confidence interval of $E[Y|A=1]-E[Y|A=0]$
+
+# 5. Estimate and confidence interval of $E[Y_1]-E[Y_0]$
+
+# 6. Assumptions of estimate $E[Y_1]−E[Y_0]$ using linear regression
 

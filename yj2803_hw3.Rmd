@@ -160,6 +160,7 @@ The 95% confidence interval is (`r list(round(ci_lower, 2), round(ci_upper, 2))`
 The point estimate suggests that the outcome \( Y \) is `r round(diff,2)` mg/dL higher on average in the bright light group compared to the dark light group among non-obese mice in this observational study. We cannot draw inferences about the causal effect in obese mice due to the violation of probabilistic assumptions. Since the 95% confidence interval includes zero, the point estimate is not statistically significant at the 95% confidence level.  
 Point estimates from (4) and (5) are different because (5) reflects the effect of adjustment for confounding bias.
 
-# 6. Assumptions of estimate $E[Y_1]−E[Y_0]$ using linear regression
-
-
+# 6. Assumptions of estimate $E[Y_1]−E[Y_0]$ using linear regression with continuous covariates
+In addition to consistency, SUTVA, exchangeability, positivity, and NUCA assumption, we need to assume the following:  
+- No measurement error: All variables need to be correctly measured.
+- No model misspecification: All models need to be correctly specified. In the linear regression, the relationship between $Y$, $A$, and covariates should be adequately approximated by a linear model.

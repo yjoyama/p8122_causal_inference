@@ -161,6 +161,7 @@ The point estimate suggests that the outcome \( Y \) is `r round(diff,2)` mg/dL 
 Point estimates from (4) and (5) are different because (5) reflects the effect of adjustment for confounding bias.
 
 # 6. Assumptions of estimate $E[Y_1]−E[Y_0]$ using linear regression with continuous covariates
-In addition to consistency, SUTVA, exchangeability, positivity, and NUCA assumption, we need to assume the following:  
-- No measurement error: All variables need to be correctly measured.
+In addition to consistency, SUTVA, exchangeability, positivity, and NUCA assumption, we need to assume the following:    
+
+- No measurement error: All variables need to be correctly measured.  
 - No model misspecification: All models need to be correctly specified. In the linear regression, the relationship between $Y$, $A$, and covariates should be adequately approximated by a linear model.

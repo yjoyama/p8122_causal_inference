@@ -110,8 +110,8 @@ The 95% confidence interval includes zero, so we cannot rule out the possibility
 $E[Y_1]- E[Y_0]=\sum_c E[Y |A=1, C = c] Pr(C = c)-\sum_c E[Y |A=0, C = c] Pr(C = c)$ given g-formula from (3). I will calculate the estimate by the following code:
 ```{r}
 # probability of C
-p_C0 = mean(C)
-p_C1 = 1 - mean(C)
+p_C1 = mean(C)
+p_C0 = 1 - mean(C)
 
 # estimates of E[Y | A = a, C = c]
 # if null, set to 0
@@ -157,7 +157,7 @@ ci_upper = diff + z*se
 ```
 
 The 95% confidence interval is (`r list(round(ci_lower, 2), round(ci_upper, 2))`).  
-The point estimate suggests that the outcome \( Y \) is `r round(diff,2)` mg/dL higher on average in the bright light group compared to the dark light group among non-obese mice in this observational study. We cannot draw inferences about the causal effect in obese mice due to the violation of probabilistic assumptions. Since the 95% confidence interval includes zero, the point estimate is not statistically significant at the 95% confidence level.  
+The point estimate suggests that the outcome \( Y \) is `r round(diff,2)` mg/dL higher on average in the bright light group compared to the dark light group among non-obese mice in this observational study. We cannot draw inferences about the causal effect in obese mice due to the violation of probabilistic assumptions. Since the 95% confidence interval does not includes zero, the point estimate is statistically significant at the 95% confidence level.  
 Point estimates from (4) and (5) are different because (5) reflects the effect of adjustment for confounding bias.
 
 # 6. Assumptions of estimate $E[Y_1]−E[Y_0]$ using linear regression with continuous covariates

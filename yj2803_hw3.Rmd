@@ -71,12 +71,12 @@ I will use the following code to calculate the estimate of $E[Y|A=1]-E[Y|A=0]$:
 Y_1 = Y[A==1]
 Y_0 = Y[A==0]
 
-# calculate mean of Y
-mY_1 = mean(Y[A==1])
-mY_0 = mean(Y[A==0])
+# calculate E[Y|A=a]
+eY1 = mean(Y[A==1])
+eY0 = mean(Y[A==0])
 
 # calculate the estimate of causal effect
-diff = mY_1 - mY_0
+diff = eY1 - eY0
 ```
 
 $E[Y|A=1]-E[Y|A=0]=$ `r round(diff,2)`
@@ -107,8 +107,58 @@ The point estimate suggests that on average, the outcome $Y$ is `r round(-diff,2
 The 95% confidence interval includes zero, so we cannot rule out the possibility that there is no causal effect between the bright and dark light groups (the result is not statistically significant with 95% confidence).
 
 # 5. Estimate and confidence interval of $E[Y_1]-E[Y_0]$
+$E[Y_1]- E[Y_0]=\sum_c E[Y |A=1, C = c] Pr(C = c)-\sum_c E[Y |A=0, C = c] Pr(C = c)$ given g-formula from (3). I will calculate the estimate by the following code:
+```{r}
+# probability of C
+p_C0 = mean(C)
+p_C1 = 1 - mean(C)
 
+# estimates of E[Y | A = a, C = c]
+# if null, set to 0
+mY_0_0 = mean(Y[A == 0 & C == 0])
+mY_0_1 = mean(Y[A == 0 & C == 1])
+mY_1_0 = mean(Y[A == 1 & C == 0])
+mY_1_1 = mean(Y[A == 1 & C == 1])
+```
 
+Here we notice that no obese mouse was assigned to bright light group. This violates the probabilistic assumption, so I will remove obese mouse group and only consider the non-obese mice.
+
+```{r}
+
+# g-formula estimates
+eY1 = p_C0 * mY_1_0
+eY0 = p_C0 * mY_0_0 
+
+# difference E[Y1] - E[Y0]
+diff = eY1 - eY0
+```
+
+$E[Y_1]- E[Y_0]=$ `r round(diff, 2)`
+
+95% condifence interval can be obtained using the following code:
+```{r}
+# critical value
+z = qnorm(1 - 0.05 / 2)
+
+# size
+n1_0 = sum(A == 1 & C == 0) # A=1, C=0
+n0_0 = sum(A == 0 & C == 0) # A=0, C=0
+
+# variance
+var1_0 = var(Y[A == 1 & C == 0])
+var0_0 = var(Y[A == 0 & C == 0])
+
+# standard error
+se = sqrt(var1_0/n1_0 + var0_0/n0_0)
+
+# 95% CI
+ci_lower = diff - z*se
+ci_upper = diff + z*se
+```
+
+The 95% confidence interval is (`r list(round(ci_lower, 2), round(ci_upper, 2))`).  
+The point estimate suggests that the outcome \( Y \) is `r round(diff,2)` mg/dL higher on average in the bright light group compared to the dark light group among non-obese mice in this observational study. We cannot draw inferences about the causal effect in obese mice due to the violation of probabilistic assumptions. Since the 95% confidence interval includes zero, the point estimate is not statistically significant at the 95% confidence level.  
+Point estimates from (4) and (5) are different because (5) reflects the effect of adjustment for confounding bias.
 
 # 6. Assumptions of estimate $E[Y_1]−E[Y_0]$ using linear regression
 

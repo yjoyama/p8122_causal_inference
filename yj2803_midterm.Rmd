@@ -28,7 +28,13 @@ theme_set(
 Given the table, $E[Y \mid A = 1]=\frac{1+0+1+0+0+0+0+1+1+0}{10}=0.4$ and $E[Y \mid A = 0]=\frac{0+0+1+0+0+0+0+1+0+0}{10}=0.2$. So $ACE=0.4-0.2=0.2$.   
 This suggest that the new treatment has 20% higher likelihood of disease prevention compared to standard treatment. 
 
-(3) 
+(3) The observed effect in (2) is smaller than in (1). The counterfactuals in (2) are unknown, and knowing (1), it appears that some individuals who would have shown a preventive effect with the new treatment were assigned to the standard treatment group in (2). This potentially attenuates the effect observed in (2).
 
+(4) 
+(a) Observational study   
+In an observational study, the intervention is not assigned randomly and the exposure is likely to be influenced by various factors. Moreover, we may observe different number of individuals in each exposure groups by the nature of the data collection process. This can leads to a biased estimates of the outcome effect.  
+
+(b) Randomized controlled trial  
+In RCT, the randomization of treatment (intervention) assignment leads to expected balance on both observed and unobserved covariates in each group. This can minimize confounding and allows for an unbiased estimate of treatment effect under the necessary assumptions. 
 
 

@@ -21,3 +21,14 @@ theme_set(
   )
 ```
 
+# Question 1
+(1) We know all the potential outcomes, so the causal effect of the treatment for an individual can be calculated by $Y_1-Y_0$ ($Y_1$: the potential outcome of a disease if an individual is assigned new treatment, $Y_0$: the potential outcome of a disease if an individual is assigned standard treatment). The average causal effect is $E[Y_1-Y_0]=$ `r 6/20`. On average, the new treatment prevents disease in 30% more individuals compared to the standard treatment.
+
+(2) Under consistency, SUTVA, randomizeation and positivity assumption, $ACE=E[Y_1 - Y_0] = E[Y_1 \mid A = 1] - E[Y_0 \mid A = 0]=E[Y \mid A = 1] - E[Y \mid A = 0]$  
+Given the table, $E[Y \mid A = 1]=\frac{1+0+1+0+0+0+0+1+1+0}{10}=0.4$ and $E[Y \mid A = 0]=\frac{0+0+1+0+0+0+0+1+0+0}{10}=0.2$. So $ACE=0.4-0.2=0.2$.   
+This suggest that the new treatment has 20% higher likelihood of disease prevention compared to standard treatment. 
+
+(3) 
+
+
+

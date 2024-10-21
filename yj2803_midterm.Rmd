@@ -292,4 +292,65 @@ $L\rightarrow A$: Individuals with normal WBC count (L = 1) are more likely to b
 $L\rightarrow Y$: Individuals with normal WBC count (L = 1) are more likely to have disease prevented (Y = 1)   
 $A\rightarrow Y$: The treatment (A) has a causal effect on disease prevention (Y)  
 
-(13)
+(13) b. The causal estimate would appear to be larger in magnitude than the true causal effect. Those with normal WBC are more likely to receive the new treatment and also more likely to experience a better disease prognosis. This would exaggerate the apparent effect of the new treatment.  
+
+(14) g-formula for the observational study: $\sum_l E[Y |A=1, L = l] Pr(L= l)-\sum_l E[Y |A=0, L = l] Pr(L = l)$ under NUCA.   
+Given the table, I will calculate the estimate and 95% CI for ACE as follows:
+```{r}
+# estimate
+# probability of L
+pl1 = 15/40
+pl0 = 1 - pl1
+
+# estimates of E[Y | A = a, L = l]
+ya1l1 = (1+1+0+1+1+1+1+1+1+1)/10
+ya1l0 = (0+1+1+1+1+0+0+1+0+1)/10
+ya0l1 = (0+0+1+1+1)/5
+ya0l0 = (0+0+0+0+1+1+1+1+0+0+0+0+1+0+1)/15
+
+# estimate for ACE using g-formula
+diff = (ya1l1*pl1+ya1l0*pl0) - (ya0l1*pl1+ya0l0*pl0)
+
+# 95% CI
+# critical value
+z = qnorm(1 - 0.05 / 2)
+
+# size
+na1l1 = 10
+na1l0 = 10
+na0l1 = 5
+na0l0 = 15
+
+# variance
+va1l1 = var(c(1,1,0,1,1,1,1,1,1,1))
+va1l0 = var(c(0,1,1,1,1,0,0,1,0,1))
+va0l1 = var(c(0,0,1,1,1))
+va0l0 = var(c(0,0,0,0,1,1,1,1,0,0,0,0,1,0,1))
+
+# standard error
+se = sqrt(va1l1/na1l1 + va1l0/na1l0 + va0l1/na0l1 + va0l0/na0l0)
+
+# 95% CI
+ci_lower = diff - z*se
+ci_upper = diff + z*se
+```
+
+The estimate is `r round(diff, 2)` (95%CI: `r round(ci_lower, 2)`, `r round(ci_upper, 2)`).
+After adjusting for L, the point estimate indicates the positive effect of the new treatment compared to the standard treatment. However, the confidence interval for this estimate includes 0, implying that the effect is not statistically significant at the 95% confidence level.
+
+(15) The ACE in (14) is lower than the ACE in (1). This is because, in (14), the potential confounder L (WBC count) was taken into account. By adjusting for L, we control for the bias introduced by the fact that individuals with normal WBC counts (who are more likely to receive the new treatment) also have a better prognosis. In (1), the confounder L was not accounted for, which may have led to an overestimation of the treatment effect due to this confounding factor. 
+
+(16) $Pr(A=1|L=1)=$ `r round(10/15, 2)`  
+$Pr(A=1|L=0)=$ `r round(10/25, 2)`  
+This supports the hypothesis of individuals with normal WBC counts (L = 1) to be more likely to be prescribed the new treatment.  
+$E[Y |A=1, L = 1]-E[Y |A=1, L = 0]=$ `r round(ya1l1-ya1l0,2)`    
+$E[Y |A=0, L = 1] -E[Y |A=0, L = 0] =$ `r round(ya0l1-ya0l0,2)`  
+When comparing WBC count status within each treatment group (as above), we can see that those with normal WBC counts (L = 1) to be more likely to have a better disease prognosis. Therefore, the data also supports the hypothesis.
+
+(17)
+
+
+
+
+
+

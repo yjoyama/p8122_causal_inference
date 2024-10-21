@@ -15,6 +15,7 @@ library(tidyverse)
 library(ggplot2)
 library(knitr)
 library(perm)
+library(ri)
 
 # setup plot theme
 theme_set(
@@ -208,7 +209,87 @@ p_val = sum(rdist >= T_obs) / length(rdist)
 ```
 The exact p-value is `r format(p_val, scientific = FALSE)`.
 
-Under $\alpha=0.05$, the exact p-value < 0.05 suggests that the observed test statistic is unlikely to have occurred under the sharp null hypothesis. Therefore, we reject the null hypothesis. We can conclude that the new treatment compared to standard treatment has a causal effect on disease prevention.
+Under $\alpha=0.10$, the exact p-value < 0.10 suggests that the observed test statistic is unlikely to have occurred under the sharp null hypothesis. Therefore, we reject the null hypothesis. We can conclude that the new treatment compared to standard treatment has a causal effect on disease prevention.
 
+(8) To calculate 90% CI, I will first set the grid as follows:
+```{r}
+grid = seq(-0.8, 0.8, by = 0.05)
+```
 
+Next, I will generate the randomization distribution for each hypothesized treatment effect.
+```{r}
+p.ci = rep(NA, length(grid)) # initialize p-value vector
+rdist = rep(NA, times = A_num) # initialize rdist for number of permutations
 
+for (i in 1:length(grid)) {
+  for (k in 1:A_num) {
+    A_tilde <- new_A[k,] # get treatment assignment from new_A
+    rdist[k] <- mean(df$Y[A_tilde == 1]) - mean(df$Y[A_tilde == 0]) + grid[i]
+  }
+  p.ci[i] <- mean(rdist >= T_stat)  # calculate p-value for each hypothesized τ
+}
+
+cbind(p.ci,grid)
+```
+Given the output, the point estimate is the value with the highest p-value under the null. Therefore it is 0.60. 
+Now, let's calculate the 90% CI.
+```{r}
+prob <- rep(mean(df$A), length(df$A))  # probability of treatment assignment
+perms <- t(new_A)  # transpose to get N-by-r matrix
+
+# calculate the 90% confidence interval
+ci_lower <- invert.ci(df$Y, df$A, prob, perms, 0.05)  
+ci_upper <- invert.ci(df$Y, df$A, prob, perms, 0.95) 
+```
+
+90% CI: (`r round(ci_lower,2)`, `r round(ci_upper,2)`)  
+The non-zero positive point estimate 0.60 indicates that the observed data suggests a positive effect of the new treatment compared to the standard one. The 90% CI does not include 0, suggesting that we can reject the sharp null hypothesis at the 90% confidence level. 
+
+(9) First, I will calculate point estimate (SACE) and variance of the estimator.
+```{r}
+Yb_obs1 <- mean(df$Y[df$A == 1])  # mean outcome for treatment group
+Yb_obs0 <- mean(df$Y[df$A == 0])  # mean outcome for control group
+
+# SACE point estimate
+SACE <- Yb_obs1 - Yb_obs0
+
+# variance 
+S1_sq <- var(df$Y[df$A == 1])  # new treatment group
+S0_sq <- var(df$Y[df$A == 0])  # standard treatment group
+
+N1 = 10
+N0 = 10
+
+# variance of the estimator
+var_SACE = (S1_sq / N1) + (S0_sq / N0)
+```
+
+$\hat{SACE}=$ `r SACE`  
+$\hat{var}(\hat{SACE})=$ `r round(var_SACE, 3)`  
+
+Confidence intervals can be calculated by $\hat{SACE}\pm z\sqrt{\hat{var}(\hat{SACE})}$. Therefore,
+```{r}
+# 90% CI
+z = qnorm(1 - 0.10 / 2)
+ci_lower = SACE - z * sqrt(var_SACE)
+ci_upper = SACE + z * sqrt(var_SACE)
+```
+90% CI: (`r round(ci_lower,2)`, `r round(ci_upper,2)`)   
+The non-zero positive point estimate `r SACE` indicates that on average, the new treatment increases the likelihood of disease prevention by 50% compared to the standard treatment. The 90% CI does not include 0, suggesting that we can reject the null hypothesis (there is no average new treatment effect) at the 90% confidence level. 
+
+(10) 
+The estimate in (1) (0.3) is lower than the estimates obtained in both (8) (0.60) and (9) (0.5). The result from (9) suggests a stronger positive effect of the new treatment compared to (1). This discrepancy may arise from the small sample size of the study, as Neyman's inference relies on the Central Limit Theorem (CLT). The result from (8) focuses more on hypothesis testing rather than precise estimation. Despite the differences, both (8) and (9) point in the same direction, indicating a positive causal effect of the new treatment, consistent with the true estimate in (1).
+
+(11) The scientific question would be "On average, how much does the new treatment affect disease prevention compared to the standard treatment, accounting for the potential confounding factor of normal or abnormal WBC count?"
+
+(12) 
+![](./pic/mid_p12.png)  
+A: Treatment (A = 1 new treatment, A = 0 standard treatment)  
+Y: Disease prevention (Y = 1 prevented, Y = 0 not prevented)  
+L: WBC count (L = 1 normal, L = 0 abnormal)  
+Representation:  
+$L\rightarrow A$: Individuals with normal WBC count (L = 1) are more likely to be prescribed the new treatment (A = 1)  
+$L\rightarrow Y$: Individuals with normal WBC count (L = 1) are more likely to have disease prevented (Y = 1)   
+$A\rightarrow Y$: The treatment (A) has a causal effect on disease prevention (Y)  
+
+(13)

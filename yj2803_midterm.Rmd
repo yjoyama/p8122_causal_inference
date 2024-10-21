@@ -13,6 +13,8 @@ knitr::opts_chunk$set(echo = T, message = F, warning = F)
 # libraries
 library(tidyverse)
 library(ggplot2)
+library(knitr)
+library(perm)
 
 # setup plot theme
 theme_set(
@@ -36,5 +38,177 @@ In an observational study, the intervention is not assigned randomly and the exp
 
 (b) Randomized controlled trial  
 In RCT, the randomization of treatment (intervention) assignment leads to expected balance on both observed and unobserved covariates in each group. This can minimize confounding and allows for an unbiased estimate of treatment effect under the necessary assumptions. 
+
+(5) Given the data, we can rule out the crossover trial because each individual receive only one of the treatment.  
+
+(6) Knowing the true potential outcomes under both treatments, I first divide the participants into three groups, G=1, G=2, and G=3, with G=1 being individuals whose outcomes are not affected by treatment assignment, G=2 being individuals whose outcomes are positively affected by the new treatment, and G=3 being individuals whose outcomes are negatively affected by the new treatment. I then use R to randomize the treatment within each group based on the complete randomization method, with the size of the new treatment group equal to the standard treatment. Below is a table showing the results of this assignment mechanism.  
+
+```{r echo=F}
+df <- data.frame(
+  Individual = 1:20,
+  G = c(2, 1, 2, 1, 1, 1, 2, 1, 2, 1, 3, 1, 1, 1, 2, 3, 2, 2, 1, 2)
+)
+
+# function to assign random A=1 and A=0 within each group
+set.seed(123)
+assign_treatment <- function(data) {
+  # number of individuals in the group
+  n <- nrow(data)
+  
+  # generate equal number of 1s and 0s
+  treatment <- sample(c(rep(1, n/2), rep(0, n/2)))
+  
+  # return the treatment assignment
+  return(treatment)
+}
+
+# apply the function within each group
+set.seed(123)
+df$A <- ave(df$G, df$G, FUN = function(x) assign_treatment(df[df$G == x[1], ]))
+
+# add observed outcome Y
+df <- df |> 
+  mutate(
+    Y = c(1,0,1,0,1,0,0,0,0,0,0,0,0,1,0,1,1,0,0,1)
+  )
+
+df <- df |> 
+  select(-G, G)
+
+kable(df)
+```
+
+(7) 
+```{r}
+# set up the data frame based on the table
+df <- data.frame(
+  Individual = 1:20,
+  A = c(1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1),
+  Y = c(1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 1),
+  G = c(2, 1, 2, 1, 1, 1, 2, 1, 2, 1, 3, 1, 1, 1, 2, 3, 2, 2, 1, 2)
+)
+
+Yb_obs1 = df |>
+  filter(A == 1) |>
+  summarize(mean_Y_obs = mean(Y)) |>
+  pull(mean_Y_obs)
+Yb_obs0 = df |>
+  filter(A == 0) |>
+  summarize(mean_Y_obs = mean(Y)) |>
+  pull(mean_Y_obs)
+
+# calculate t_obs
+T_obs = Yb_obs1 - Yb_obs0
+
+# possible number of treatment assignment
+A_num = choose(10, 5)*choose(8, 4)*choose(2, 1)
+
+# record possible treatment assignment in each blosck as a matrix
+g1 = chooseMatrix(10,5)
+g2 = chooseMatrix(8,4)
+g3 = chooseMatrix(2,1)
+
+# create a function to generate the combinations
+gen_comb <- function(g1, g2, g3) {
+  # Get the number of rows for each matrix
+  num_rows_g1 <- nrow(g1)
+  num_rows_g2 <- nrow(g2)
+  num_rows_g3 <- nrow(g3)
+  
+  # initialize an empty matrix to store results
+  result <- matrix(nrow = 0, ncol = ncol(g1) + ncol(g2) + ncol(g3))
+  
+  # loop through all rows of g1, g2, and g3
+  for (i in 1:num_rows_g1) {
+    for (j in 1:num_rows_g2) {
+      for (k in 1:num_rows_g3) {
+        # concatenate rows from g1, g2, and g3
+        new_row <- c(g1[i, ], g2[j, ], g3[k, ])
+        # append the new row to the result matrix
+        result <- rbind(result, new_row)
+      }
+    }
+  }
+  return(result)
+}
+
+# call the function to generate the matrix
+A <- gen_comb(g1, g2, g3)
+
+# create a placeholder for the reordered matrix based on the table for individual 1-20
+new_A <- matrix(nrow = nrow(A), ncol = length(df$G))
+
+# loop through df$G and assign the columns in the desired order
+g1_cols <- 1:10      # columns for g=1
+g2_cols <- 11:18     # columns for g=2
+g3_cols <- 19:20     # columns for g=3
+
+for (i in 1:length(df$G)) {
+  if (df$G[i] == 1) {
+    new_A[, i] <- A[, g1_cols[1]]  # take the first column for g=1
+    g1_cols <- g1_cols[-1]         # remove the used column from g1
+  } else if (df$G[i] == 2) {
+    new_A[, i] <- A[, g2_cols[1]]  # take the first column for g=2
+    g2_cols <- g2_cols[-1]         # remove the used column from g2
+  } else if (df$G[i] == 3) {
+    new_A[, i] <- A[, g3_cols[1]]  # take the first column for g=3
+    g3_cols <- g3_cols[-1]         # remove the used column from g3
+  }
+}
+```
+- Number of individuals in A=1 group: $N_1=10$    
+- Number of individuals in A=0 group: $N_0=10$    
+- Total number of individuals: $N=20$  
+- Mean of the outcome variable for A=1 group: $\bar{Y}_1^{obs}=$ `r round(Yb_obs1,2)`   
+- Mean of the outcome variable for A=0 group: $\bar{Y}_0^{obs}=$ `r round(Yb_obs0,2)`   
+- $T_{obs}=\bar{Y}_1^{\text{obs}} - \bar{Y}_0^{\text{obs}}=$ `r round(T_obs,2)`
+
+Under the assignment mechanism in (6), there are $\binom{10}{5}\times \binom{8}{4}\times \binom{2}{1}=$ `r format(A_num, scientific = FALSE)` possibilities for $A$.
+
+The sharp null hypothesis:  
+$H_0: Y_i^1 = Y_i^0 \quad \text{for all } i$  
+where $Y_i^1$ is the potential outcome for individual $i$ if they are assigned to $A=1$, and $Y_i^0$ is the potential outcome for individual $i$ if they are assigned to $A=0$.
+```{r}
+# create df that has the group assignment based on the first row of matrix A
+df2 = df 
+df2$A = new_A[1,]  
+
+# calculate t under the first possibility of A, under the sharp null hypothesis
+T_stat = mean(df2$Y[df2$A == 1]) - mean(df2$Y[df2$A == 0])
+```
+Under the sharp null hypothesis, the test statistic under the first row of matrix `new_A` is `r round(T_stat,2)`.
+
+I will iterate this process for all the possibilities of matrix `new_A` to obtain the exact randomization distribution for T under the sharp null hypothesis.  
+```{r}
+# set up df to store T statistic values
+rdist = rep(NA, times = A_num)
+
+# iteration
+for (i in 1:A_num) {
+  df_ite = df2
+  df_ite$A = new_A[i,]
+  rdist[i] = mean(df_ite$Y[df_ite$A == 1]) - mean(df_ite$Y[df_ite$A == 0])
+}
+```
+
+The $T_{obs}$ is the red line in the plot.
+```{r}
+# plot histogram
+ggplot(data.frame(t_stat = rdist), aes(x = t_stat)) +
+  geom_histogram(binwidth = 0.2, color = "black", fill = "lightblue") +
+  geom_vline(aes(xintercept = T_obs), color = "red", size = 0.5) + # add T_obs line
+  labs(title = "Histogram of T Statistics", x = "T Statistic", y = "Frequency")
+```
+
+Based on this distribution, we can obtain the exact p-value by the following formula:  
+$P(T(A, Y) \geq T_{obs} | Y_i^1-Y_i^0 = 0) = \frac{\sum I(T(A, Y) \geq T_{obs})}{K}$ where $K = \binom{10}{5}\times \binom{8}{4}\times \binom{2}{1}$.
+```{r}
+# calculate the exact p-value
+p_val = sum(rdist >= T_obs) / length(rdist)
+```
+The exact p-value is `r format(p_val, scientific = FALSE)`.
+
+Under $\alpha=0.05$, the exact p-value < 0.05 suggests that the observed test statistic is unlikely to have occurred under the sharp null hypothesis. Therefore, we reject the null hypothesis. We can conclude that the new treatment compared to standard treatment has a causal effect on disease prevention.
+
 
 

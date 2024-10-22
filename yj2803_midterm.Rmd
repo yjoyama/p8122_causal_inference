@@ -347,10 +347,28 @@ $E[Y |A=1, L = 1]-E[Y |A=1, L = 0]=$ `r round(ya1l1-ya1l0,2)`
 $E[Y |A=0, L = 1] -E[Y |A=0, L = 0] =$ `r round(ya0l1-ya0l0,2)`  
 When comparing WBC count status within each treatment group (as above), we can see that those with normal WBC counts (L = 1) to be more likely to have a better disease prognosis. Therefore, the data also supports the hypothesis.
 
-(17)
+(17) Conditioning on a set of variable {B, F} would close all the back-door paths between A and Y.
 
+(18) NUCA: A is independent of $Y_0$ and $Y_1$ given the observed covariates.  
+If there are no unmeasured variables (e.g., U) that act as a confounder for both A and Y (i.e., no unmeasured variables are associated with A or Y conditional on A, and they do not lie on a causal pathway between A and Y), the DAG satisfies the NUCA. 
 
+(19) Conditioning on H would open a closed path from A to Y (e.g., $A\leftarrow H \leftarrow F\rightarrow Y$).
 
+(20) Collider is a node on a path in a DAG where two arrows from different nodes both point into that node. Conditioning (adjusting) for a collider is problematic because it can create the association of its parents that has been d-separated. In other words, it can open a backdoor path between otherwise independent variables and create a non-causal association. The collider in the given DAG is H ($L\rightarrow H\leftarrow F$). 
 
+# Question 2
+(1)  
+- Units are the hospitals two years after the intervention (i.e., with or without workshops)
+- Potential outcomes are the number of doctors from minority backgrounds promoted to leadership positions in each hospital two years later, either with or without receiving the workshop
+- Treatment is the workshop focusing on the benefits of diversity in leadership (mandated due to majority of white doctors in leadership positions, or on request by hospital administrators)
+- Observed covariates may include the current proportion of white doctors in leadership at baseline, hospital size, location, hospital type, insurance coverage, etc.
+
+(2) I would be interested in examining the difference in the average number of physicians from minority backgrounds promoted to leadership positions between hospitals that took the diversity workshop and those that did not. In mathematical formula, this difference in effect can be described as:  
+$\sum_c E[Y |A=1, C = c] Pr(C= c)-\sum_c E[Y |A=0, C = c] Pr(C = c)$  
+where Y is the outcome, A is the treatment (1: receiving the workshop, 0: not receiving the workshop), and C is observed covariates or potential confounders.
+
+(3) The study design is quasi-experimental because the workshop is assigned based on pre-existing conditions, rather than through randomized assignment. Specifically, hospitals with a higher proportion of white doctors in leadership positions automatically receive the workshop, while other hospitals receive it only upon request by hospital administrators. This non-randomized assignment introduces potential biases. This design is not ideal to address my question because the treatment assignment is influenced by pre-existing conditions (e.g., the racial composition of leadership, hospital budget, or administrators' race, which could affect their decision to request the workshop). As a result, the design may violate key assumptions such as positivity, randomization, and NUCA, which can complicate the interpretation of causal effects.
+
+(4) A randomized controlled trial would be the ideal study design, where hospitals are randomly assigned to receive the workshop or not. Given potential discrepancies in the baseline characteristics of hospitals, I would recommend implementing block randomization, using the proportion of white physicians in leadership as a binary variable (>95% or $\leq$95%). Following this, the g-formula can be applied to estimate the causal effect between the treatment and control groups. If more hospital characteristics are available, propensity score matching would be appropriate to better balance the treatment and control groups. The causal effect could then be investigated using linear regression, incorporating all potential confounders into the model for a more precise estimation.
 
 

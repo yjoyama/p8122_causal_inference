@@ -1,0 +1,71 @@
+---
+title: "Mediation Lab - Regression approach for causal mediation"
+date: "12/07/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+```{r message=F,warning=F}
+
+######################################################
+##   Statistical Methods for Causal Inference       ## 
+##   R Application                                  ##
+##   Lung cancer example                            ##
+######################################################
+
+
+## load in data 
+data_sens <- read.csv("sim_data_lung.csv")
+
+```{r fig.width=8,fig.height=4,message=F,warning=F}
+
+######################################
+### QUESTION 1C 2 AND 4###############
+######################################
+
+#install.packages("CMAverse")
+library(CMAverse)
+
+## run mediation analysis with interaction using cmest()
+mediation.int.m1 <- cmest(data = data_sens, model = "rb", casecontrol = TRUE, yrare = TRUE,
+                         outcome = "case", 
+                         exposure = "snp", mediator = "smoking", EMint = TRUE,
+                         prec = c("sex", "colgrad", "age"), 
+                         mreg = list("logistic"), yreg = "logistic", 
+                         a = 1, astar = 0, mval = list(1),
+                         estimation = "paramfunc", inference = "delta", full=FALSE)
+
+mediation.int.m0 <- cmest(data = data_sens, model = "rb", casecontrol = TRUE, yrare = TRUE,
+                         outcome = "case", 
+                         exposure = "snp", mediator = "smoking", EMint = TRUE,
+                         prec = c("sex", "colgrad", "age"), 
+                         mreg = list("logistic"), yreg = "logistic", 
+                         a = 1, astar = 0, mval = list(0),
+                         estimation = "paramfunc", inference = "delta", full=FALSE)
+
+summary(mediation.int.m1)
+
+ggcmest(mediation.int.m1) +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 30, vjust = 0.8))
+
+summary(mediation.int.m0)
+
+ggcmest(mediation.int.m0) +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 30, vjust = 0.8))
+
+
+## CDE(1) = 1.53
+## CDE(0) = 1.07
+## NIE = 1.02 
+## NDE = 1.45 
+
+```
+

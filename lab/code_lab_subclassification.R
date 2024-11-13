@@ -1,7 +1,7 @@
 setwd("~/Dropbox/P8122/causal_inference_2021/week_7_8")
 
 
-x <- read.table("gardasil.dat.txt",header = T)
+x <- read.table("./lab/gardasil.dat.txt", header = T)
 head(x)
 
 #Y: Completed

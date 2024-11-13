@@ -16,6 +16,8 @@ knitr::opts_chunk$set(echo = T, message = F, warning = F)
 library(tidyverse)
 library(ggplot2)
 library(dagitty)
+library(tableone)
+library(knitr)
 
 # setup plot theme
 theme_set(
@@ -99,4 +101,32 @@ Note of the variables in the DAG:
 `re75`: income in 1975  
 - `re75` can influence `re78`  
 `re78`: income in 1978; outcome    
+
+Given the DAG, covariates that need to be adjusted in investigating the effect of exposure on the outcome are `nodegree`, `hispan`, `black`, `educ` and `age`.  
+
+2. I will evaluate the covariate balance using standardized mean differences. 
+```{r}
+cov = c("nodegree", "hispan", "black", "educ", "age")
+
+# construct a table
+tab = CreateTableOne(vars = cov, strata = "treat", data = df, test = FALSE)
+print(tab, smd = TRUE)
+```
+We can see that most covariates have SMD > 0.1 except for `educ`, indicating the potential imbalance between the two treatment group. 
+
+3. Propensity score estimates are calculated by fitting a logistic regression. 
+```{r}
+# fit PS model
+ps.fit <- glm(as.factor(treat) ~ as.factor(nodegree) + as.factor(hispan) + as.factor(black) + educ + age, family = "binomial", data = df)
+
+ps.fit |> 
+  broom::tidy() |> 
+  kable()
+
+# estimate PS
+df.ps <- predict(ps.fit, type = 'response')
+print(df.ps[1:50])
+```
+Listed values are the propensity scores for each observation in the dataset (only showing the first 50 observations out of 614).
+
 

@@ -153,17 +153,17 @@ prop.func <- function(x, trt)
   pi.x
 }
 
-# histogram
-check.overlap(x = df,
-              trt = df$treat,
-              propensity.func = prop.func)
-
-
-# add density plot with histogram
-check.overlap(x = df,
-              trt = df$treat,
-              type = "both",
-              propensity.func = prop.func)
+# histogram and density plot to check the overlap
+ggplot(df, aes(x = ps.est, fill = as.factor(treat))) +
+  geom_histogram(aes(y = ..density..), bins = 30, alpha = 0.3, position = "identity") +
+  geom_density(aes(color = as.factor(treat)), alpha = 0.3, size = 1) +  # add density plot
+  scale_fill_manual(values = c("#F8766D", "#00BFC4"), name = "Treatment Group", labels = c("Control", "Treated"),
+                    guide = guide_legend(override.aes = list(color = NA))) +  
+  scale_color_manual(values = c("#F8766D", "#00BFC4"), guide = "none") +  
+  geom_rug(aes(color = as.factor(treat)), sides = "b", alpha = 0.5) +  # add rug plot
+  labs(title = "Distribution of Propensity Scores",
+       x = "Propensity Score",
+       y = "Density") 
 ```
 The histogram shows that the propensity score estimates does not overlap in ranges approximately [0, 0.0375] and [0.7375, 1]. I will trim the samples whose PS estimate is in these ranges. 
 
@@ -239,8 +239,8 @@ Below is the histogram and density plot of the propensity scores in each stratum
 # plot propensity scores with subclass boundaries by treatment group
 # [0.0453,0.0759]
 ggplot(df_trim1, aes(x = ps.est, fill = as.factor(treat))) +
-  geom_histogram(aes(y = ..density..), bins = 30, alpha = 0.5, position = "identity") +
-  geom_density(aes(color = as.factor(treat)), alpha = 0.5, size = 1) +  # add density plot
+  geom_histogram(aes(y = ..density..), bins = 30, alpha = 0.3, position = "identity") +
+  geom_density(aes(color = as.factor(treat)), alpha = 0.3, size = 1) +  # add density plot
   scale_fill_manual(values = c("#F8766D", "#00BFC4"), name = "Treatment Group", labels = c("Control", "Treated"),
                     guide = guide_legend(override.aes = list(color = NA))) + 
   scale_color_manual(values = c("#F8766D", "#00BFC4"), guide = "none") +  
@@ -251,8 +251,8 @@ ggplot(df_trim1, aes(x = ps.est, fill = as.factor(treat))) +
 
 # (0.0759,0.585]
 ggplot(df_trim2, aes(x = ps.est, fill = as.factor(treat))) +
-  geom_histogram(aes(y = ..density..), bins = 30, alpha = 0.5, position = "identity") +
-  geom_density(aes(color = as.factor(treat)), alpha = 0.5, size = 1) +  # add density plot
+  geom_histogram(aes(y = ..density..), bins = 30, alpha = 0.3, position = "identity") +
+  geom_density(aes(color = as.factor(treat)), alpha = 0.3, size = 1) +  # add density plot
   scale_fill_manual(values = c("#F8766D", "#00BFC4"), name = "Treatment Group", labels = c("Control", "Treated"),
                     guide = guide_legend(override.aes = list(color = NA))) +  
   scale_color_manual(values = c("#F8766D", "#00BFC4"), guide = "none") +  
@@ -263,8 +263,8 @@ ggplot(df_trim2, aes(x = ps.est, fill = as.factor(treat))) +
 
 # (0.585,0.743]
 ggplot(df_trim3, aes(x = ps.est, fill = as.factor(treat))) +
-  geom_histogram(aes(y = ..density..), bins = 30, alpha = 0.5, position = "identity") +
-  geom_density(aes(color = as.factor(treat)), alpha = 0.5, size = 1) +  # add density plot
+  geom_histogram(aes(y = ..density..), bins = 30, alpha = 0.3, position = "identity") +
+  geom_density(aes(color = as.factor(treat)), alpha = 0.3, size = 1) +  # add density plot
   scale_fill_manual(values = c("#F8766D", "#00BFC4"), name = "Treatment Group", labels = c("Control", "Treated"),
                     guide = guide_legend(override.aes = list(color = NA))) +  
   scale_color_manual(values = c("#F8766D", "#00BFC4"), guide = "none") +  
@@ -290,7 +290,37 @@ print(tab_trim3, smd = TRUE)
 ```
 Stratum 1 and 3 show acceptable balance for most covariates with `nodegree` being the most imbalanced one. Stratum 2 still shows significant imbalance, especially for the covariate `black` and `nodegree`. This may be due to the limited propensity score distribution within the range of (0.0759, 0.585].
 
-7. 
+7. I will calculate the MACE of participation in a job training on wages using the following codes.
+```{r}
+# calculate point estimate and confidence intervals
+df_trim |> 
+  group_by(ps.strata) |> # group by PS strata only
+  summarise(
+    mean.Y.0 = mean(re78[treat == 0]),
+    mean.Y.1 = mean(re78[treat == 1]),
+    var.Y.0 = var(re78[treat == 0]),
+    var.Y.1 = var(re78[treat == 1]),
+    n.0 = sum(treat == 0),
+    n.1 = sum(treat == 1)
+  ) |> 
+  mutate(
+    ACE.strata = mean.Y.1 - mean.Y.0, # stratum-specific ACEs
+    prop = (n.0 + n.1)/nrow(df_trim), # proportion of each stratum 
+    MACE = round(sum(ACE.strata * prop), 2), # point estimate of MACE
+    varace = sum((prop^2)*(var.Y.0/n.0 + var.Y.1/n.1)), # variance of a stratified estimator for a weighted mean difference across strata
+    ci.l = MACE - qnorm(1 - 0.05/2) * sqrt(varace), # CI lower limit
+    ci.u = MACE + qnorm(1 - 0.05/2) * sqrt(varace), # CI upper limit
+    z_score = MACE / sqrt(varace), 
+    "P Value" = round(2 * (1 - pnorm(abs(z_score))), 2), # calculate p-value
+    "95%CI" = paste0("(", round(ci.l, 0), ", ", round(ci.u, 0), ")")
+  ) |> 
+  select(c(MACE, "95%CI", "P Value")) |> 
+  ungroup() |> 
+  distinct() |> 
+  kable()
+
+```
+The point estimate of MACE appears to be very small and both 95% CI and p-value >0.05 implies that the job training program did not have a statistically significant effect on participants' income in 1978 in the trimmed sample. 
 
 8. 
 

@@ -18,10 +18,11 @@ library(ggplot2)
 library(dagitty)
 library(tableone)
 library(knitr)
+library(personalized)
 
 # setup plot theme
 theme_set(
-  theme_bw() +
+  theme_minimal() +
     theme(legend.position = "top")
   )
 ```
@@ -29,7 +30,14 @@ theme_set(
 
 ```{r}
 # import data 
-df = read_csv("./data/hw4_data.csv")
+df = read_csv("./data/hw4_data.csv") |> 
+  mutate(
+    treat = as.factor(treat),
+    black = as.factor(black),
+    hispan = as.factor(hispan),
+    married = as.factor(married),
+    nodegree = as.factor(nodegree)
+  )
 ```
 
 1. DAG
@@ -117,7 +125,7 @@ We can see that most covariates have SMD > 0.1 except for `educ`, indicating the
 3. Propensity score estimates are calculated by fitting a logistic regression. 
 ```{r}
 # fit PS model
-ps.fit <- glm(as.factor(treat) ~ as.factor(nodegree) + as.factor(hispan) + as.factor(black) + educ + age, family = "binomial", data = df)
+ps.fit <- glm(treat ~ nodegree + hispan + black + educ + age, family = "binomial", data = df)
 
 ps.fit |> 
   broom::tidy() |> 
@@ -129,4 +137,161 @@ print(df.ps[1:50])
 ```
 Listed values are the propensity scores for each observation in the dataset (only showing the first 50 observations out of 614).
 
+4. 
+```{r}
+# append ps estimates to dataset
+df <- df |> 
+  mutate(
+    ps.est = df.ps
+  )
 
+prop.func <- function(x, trt)
+{
+  # propensity score model
+  propens.model <- glm(as.factor(treat) ~ as.factor(nodegree) + as.factor(hispan) + as.factor(black) + educ + age, family = "binomial", data = x)
+  pi.x <- predict(propens.model, type = "response")
+  pi.x
+}
+
+# histogram
+check.overlap(x = df,
+              trt = df$treat,
+              propensity.func = prop.func)
+
+
+# add density plot with histogram
+check.overlap(x = df,
+              trt = df$treat,
+              type = "both",
+              propensity.func = prop.func)
+```
+The histogram shows that the propensity score estimates does not overlap in ranges approximately [0, 0.0375] and [0.7375, 1]. I will trim the samples whose PS estimate is in these ranges. 
+
+```{r}
+# trimming
+# eliminate controls for whom the P(A=1|C) is less that the min(P(A=1|C)) found in the treated group
+min(df$ps.est[df$treat == 1])
+head(df$ps.est[which(df$treat == 0)] <= min(df$ps.est[df$treat == 1]))
+
+length(df$ps.est[which(df$treat == 0)]<= min(df$ps.est[df$treat == 1]))
+
+# eliminate treated for whom the P(A=1|C) is greater that the max(P(A=1|C)) found in the control group
+max(df$ps.est[df$treat == 0])
+head(df$ps.est[which(df$treat == 1)]>= max(df$ps.est[df$treat == 0]))
+
+length(df$ps.est[which(df$treat == 1)]>= max(df$ps.est[df$treat == 0]))
+
+df_trim = df[df$ps.est >= min(df$ps.est[df$treat == 1]) & df$ps.est <= max(df$ps.est[df$treat == 0]),]
+
+dim(df_trim)
+```
+
+After the trimming, sample size went down from 614 to 571, which may lead to reduced statistical power. In terms of the generalizability, trimming will disable the external validity because we are only looking at individuals with non-extreme propensity scores. 
+
+5. Here I will reevaluate the covariate balance using the trimmed sample.
+```{r}
+# construct a table
+tab_trim = CreateTableOne(vars = cov, strata = "treat", data = df_trim, test = FALSE)
+print(tab_trim, smd = TRUE)
+```
+Compared to untrimmed data, the balance of `nodegree`, `black` and `age` appear to be improved while `educ` and `hispan` appear to be worsened.
+
+6. Subclassification  
+First I will refit the model using the trimmed data and recheck the overlap.
+```{r}
+# fit PS model
+ps.fit_trim <- glm(treat ~ nodegree + hispan + black + educ + age, family = "binomial", data = df_trim)
+
+ps.fit_trim |> 
+  broom::tidy() |> 
+  kable()
+
+# estimate PS
+df.ps_trim <- predict(ps.fit_trim, type = 'response')
+print(df.ps_trim[1:50])
+```
+
+I will create three strata. The breaks are shown below.
+```{r}
+df_trim = df_trim |> 
+  mutate(ps.strata = gtools::quantcut(ps.est, 3))
+
+# breaks
+quantile(df_trim$ps.est, probs = seq(0, 1, length.out = 4))
+```
+
+```{r}
+breaks = quantile(df_trim$ps.est, probs = seq(0, 1, length.out = 4))
+
+# save dataset for each strata
+df_trim1 = df_trim |> 
+  filter(ps.strata == "[0.0453,0.0759]")
+
+df_trim2 = df_trim |> 
+  filter(ps.strata == "(0.0759,0.585]")
+
+df_trim3 = df_trim |> 
+  filter(ps.strata == "(0.585,0.743]")
+```
+
+Below is the histogram and density plot of the propensity scores in each stratum. 
+```{r}
+# plot propensity scores with subclass boundaries by treatment group
+# [0.0453,0.0759]
+ggplot(df_trim1, aes(x = ps.est, fill = as.factor(treat))) +
+  geom_histogram(aes(y = ..density..), bins = 30, alpha = 0.5, position = "identity") +
+  geom_density(aes(color = as.factor(treat)), alpha = 0.5, size = 1) +  # add density plot
+  scale_fill_manual(values = c("#F8766D", "#00BFC4"), name = "Treatment Group", labels = c("Control", "Treated"),
+                    guide = guide_legend(override.aes = list(color = NA))) + 
+  scale_color_manual(values = c("#F8766D", "#00BFC4"), guide = "none") +  
+  geom_rug(aes(color = as.factor(treat)), sides = "b", alpha = 0.5) +  # add rug plot
+  labs(title = "Distribution of Propensity Scores by Stratum 1",
+       x = "Propensity Score",
+       y = "Density") 
+
+# (0.0759,0.585]
+ggplot(df_trim2, aes(x = ps.est, fill = as.factor(treat))) +
+  geom_histogram(aes(y = ..density..), bins = 30, alpha = 0.5, position = "identity") +
+  geom_density(aes(color = as.factor(treat)), alpha = 0.5, size = 1) +  # add density plot
+  scale_fill_manual(values = c("#F8766D", "#00BFC4"), name = "Treatment Group", labels = c("Control", "Treated"),
+                    guide = guide_legend(override.aes = list(color = NA))) +  
+  scale_color_manual(values = c("#F8766D", "#00BFC4"), guide = "none") +  
+  geom_rug(aes(color = as.factor(treat)), sides = "b", alpha = 0.5) +  # add rug plot
+  labs(title = "Distribution of Propensity Scores by Stratum 2",
+       x = "Propensity Score",
+       y = "Density")
+
+# (0.585,0.743]
+ggplot(df_trim3, aes(x = ps.est, fill = as.factor(treat))) +
+  geom_histogram(aes(y = ..density..), bins = 30, alpha = 0.5, position = "identity") +
+  geom_density(aes(color = as.factor(treat)), alpha = 0.5, size = 1) +  # add density plot
+  scale_fill_manual(values = c("#F8766D", "#00BFC4"), name = "Treatment Group", labels = c("Control", "Treated"),
+                    guide = guide_legend(override.aes = list(color = NA))) +  
+  scale_color_manual(values = c("#F8766D", "#00BFC4"), guide = "none") +  
+  geom_rug(aes(color = as.factor(treat)), sides = "b", alpha = 0.5) +  # add rug plot
+  labs(title = "Distribution of Propensity Scores by Stratum 3",
+       x = "Propensity Score",
+       y = "Density") 
+```
+Now, let's inspect the covariate balance in each stratum. 
+
+```{r}
+# stratum 1
+tab_trim1 = CreateTableOne(vars = cov, strata = "treat", data = df_trim1, test = FALSE)
+print(tab_trim1, smd = TRUE)
+
+# stratum 2
+tab_trim2 = CreateTableOne(vars = cov, strata = "treat", data = df_trim2, test = FALSE)
+print(tab_trim2, smd = TRUE)
+
+# stratum 3
+tab_trim3 = CreateTableOne(vars = cov, strata = "treat", data = df_trim3, test = FALSE)
+print(tab_trim3, smd = TRUE)
+```
+Stratum 1 and 3 show acceptable balance for most covariates with `nodegree` being the most imbalanced one. Stratum 2 still shows significant imbalance, especially for the covariate `black` and `nodegree`. This may be due to the limited propensity score distribution within the range of (0.0759, 0.585].
+
+7. 
+
+8. 
+
+9. The advantage of regression based approach is that it can be applied to 

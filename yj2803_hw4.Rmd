@@ -307,7 +307,8 @@ df_trim |>
     ACE.strata = mean.Y.1 - mean.Y.0, # stratum-specific ACEs
     prop = (n.0 + n.1)/nrow(df_trim), # proportion of each stratum 
     MACE = round(sum(ACE.strata * prop), 2), # point estimate of MACE
-    varace = sum((prop^2)*(var.Y.0/n.0 + var.Y.1/n.1)), # variance of a stratified estimator for a weighted mean difference across strata
+    # variance of a stratified estimator for a weighted mean difference across strata
+    varace = sum((prop^2)*(var.Y.0/n.0 + var.Y.1/n.1)), 
     ci.l = MACE - qnorm(1 - 0.05/2) * sqrt(varace), # CI lower limit
     ci.u = MACE + qnorm(1 - 0.05/2) * sqrt(varace), # CI upper limit
     z_score = MACE / sqrt(varace), 
@@ -322,15 +323,63 @@ df_trim |>
 ```
 The point estimate of MACE appears to be very small and both 95% CI and p-value >0.05 implies that the job training program did not have a statistically significant effect on participants' income in 1978 in the trimmed sample. 
 
-8. In order to compare it with subclassification approach, I will use trimmed data to construct linear regression model. 
+8. I will use construct linear regression model to directly adjust for the confounders. 
 ```{r}
 # linear model
-df_trim |> 
+df |> 
   lm(re78 ~ treat + nodegree + hispan + black + educ + age, data = _) |> 
   broom::tidy() |> 
-  mutate(across(where(is.numeric), ~ round(., 2))) |> 
   kable()
 ```
-From the results, we can see that `treat = 1` has $822.05 more income than `treat = 0`, holding other variables constant. However, the p-value >0.05 indicates that this is not statistically significant. Although the point estimate is quite different from what we observed in the subclassification approach, both are consistent with the insignificant effect of the job training program on income in 1978.
 
-9. The advantage of regression based approach is that it can be applied to 
+This is still conditinal effects within the strata of observed covariates. I will calculate the marginal effect by standardization as follows:
+```{r}
+# predict outcome values 
+lm.fit = lm(re78 ~ treat + nodegree + hispan + black + educ + age, data = df)
+df$pred <- predict(lm.fit, newdata = df)
+
+# MACE estimate 
+# difference between mean predicted values for rows with A=1 and mean predicted values for rows with A = 0
+df |> 
+  group_by(treat) |>  
+  summarise(
+    mean.Y = mean(pred)
+  ) |> 
+  pivot_wider(
+    names_from = treat,
+    names_glue = "mean.Y.{treat}", values_from = mean.Y
+  ) |>  
+  mutate(
+    MACE = mean.Y.1-mean.Y.0, # calculate MACE
+    n.0 = sum(df$treat == 0),
+    n.1 = sum(df$treat == 1),
+    var.Y.0 = var(df$pred[df_trim$treat == 0]), 
+    var.Y.1 = var(df$pred[df_trim$treat == 1]),
+    se = sqrt(var.Y.0/n.0 + var.Y.1/n.1), # standard error
+    ci.l = MACE - qnorm(1 - 0.05/2) * sqrt(se), # CI lower limit
+    ci.u = MACE + qnorm(1 - 0.05/2) * sqrt(se), # CI upper limit
+    z_score = MACE / sqrt(se), 
+    "P Value" = 2 * (1 - pnorm(abs(z_score))), # calculate p-value
+    "95%CI" = paste0("(", round(ci.l, 0), ", ", round(ci.u, 0), ")")
+  ) |> 
+  select(c(MACE, "95%CI", "P Value")) |> 
+  ungroup() |> 
+  distinct() |> 
+  kable()
+```
+
+From the results, we observe that `treat = 1` is associated with $635.03 less income than `treat = 0`. The 95% CI and p-value <0.05 indicate statistical significance, suggesting a negative impact of the job training program on income in 1978. This finding contrasts with the subclassification approach. It’s possible that residual imbalance remains in the subclassification model due to a limited number of strata, which could bias the results. Alternatively, the linear regression model may suffer from violations of modeling assumptions. Further investigation is necessary to determine the optimal model to minimize bias in both approaches.
+
+9.       
+
+**Subclassification Approach**    
+Advantages: Because the modeling decisions come before looking at outcome data, it work against p-hacking. Also, the outcome model makes fewer modeling assumption than regression based approach conditioning on many covariates. Visualizing a potential positivity violation is helpful for reducing the outcome bias. 
+
+Disadvantages: In order to balancing the covariates between two exposure groups, we often sacrifice the sample size, so the power can go down.
+
+**Regression Based Approach**   
+Advantages: When the number of confounders is small, this approach requires less calculation and could be more efficient.  
+
+Disadvantages: As mentioned above, p-hacking could be problematic. When there are too many confounders compared to the number of events, by the rule of thumb, this approach is not recommended. 
+
+

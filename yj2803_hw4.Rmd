@@ -322,6 +322,15 @@ df_trim |>
 ```
 The point estimate of MACE appears to be very small and both 95% CI and p-value >0.05 implies that the job training program did not have a statistically significant effect on participants' income in 1978 in the trimmed sample. 
 
-8. 
+8. In order to compare it with subclassification approach, I will use trimmed data to construct linear regression model. 
+```{r}
+# linear model
+df_trim |> 
+  lm(re78 ~ treat + nodegree + hispan + black + educ + age, data = _) |> 
+  broom::tidy() |> 
+  mutate(across(where(is.numeric), ~ round(., 2))) |> 
+  kable()
+```
+From the results, we can see that `treat = 1` has $822.05 more income than `treat = 0`, holding other variables constant. However, the p-value >0.05 indicates that this is not statistically significant. Although the point estimate is quite different from what we observed in the subclassification approach, both are consistent with the insignificant effect of the job training program on income in 1978.
 
 9. The advantage of regression based approach is that it can be applied to 

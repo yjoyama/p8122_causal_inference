@@ -1,0 +1,26 @@
+---
+title: "Homework 6"
+author: "Yuki Joyama"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+    extra_dependencies: ["fontspec", "amsmath", "amssymb", "unicode-math"]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T, message = F, warning = F)
+```
+
+```{r}
+# libraries
+library(tidyverse)
+library(ggplot2)
+library(patchwork)
+library(knitr)
+
+# setup plot theme
+theme_set(
+  theme_minimal() +
+    theme(legend.position = "top")
+  )
+```

@@ -15,8 +15,13 @@ knitr::opts_chunk$set(echo = T, message = F, warning = F)
 # libraries
 library(tidyverse)
 library(ggplot2)
-library(patchwork)
+library(readr)
+library(dagitty)
 library(knitr)
+
+# install.packages("remotes")
+# remotes::install_github("LindaValeri/CMAverse")
+library(CMAverse)
 
 # setup plot theme
 theme_set(
@@ -24,3 +29,103 @@ theme_set(
     theme(legend.position = "top")
   )
 ```
+
+```{r}
+# import data
+df = read_csv("./data/sim_data_bangladesh.csv") |> 
+  dplyr::select(-"...1") |> 
+  mutate(
+    female = as.factor(female)
+  )
+```
+
+Hypothesis: fetal growth could be involved in the mechanism explaining the effect of manganese on child neurodevelopment
+
+# 1. NDE, NIE, TE
+Exposure: `ln_mn_c`  
+Mediator: `birthlength_c`  
+Outcome: `cognitive_raw`  
+Covariates: `female`, `approxage`, `protein_c`
+
+I will estimate causal effects using the following code:
+```{r}
+med_result = cmest(
+  data = df,
+  model = "rb", # regression-based approach
+  outcome = "cognitive_raw",
+  exposure = "ln_mn_c",
+  mediator = "birthlength_c",
+  basec = c("female", "approxage", "protein_c"),
+  EMint = TRUE,  # allow exposure-mediator interaction
+  mreg = list(type = "linear"),  
+  yreg = "linear", 
+  estimation = "paramfunc",
+  inference = "delta",
+  full = FALSE,
+  astar = 0, # reference value
+  a = 1, 
+  mval = list(1)
+)
+
+summary(med_result)
+
+# visualization
+ggcmest(med_result) +
+ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 30, vjust = 0.8))
+```
+
+- Pure natural direct effect (PNDE): -0.356 (95%CI -0.857, 0.146)
+- Total natural direct effect (TNDE): -0.453 (95%CI -0.963, 0.058)
+- Pure natural indirect effect (PNIE): -0.295 (95%CI -0.467, -0.122)
+- Total natural indirect effect (TNIE): -0.392 (95%CI -0.621, -0.162) 
+- Total effect: -0.747 (95%CI -1.285, -0.209)
+
+# 2. Interpretation and assumptions  
+- Natural direct effect (NDE): The NDE compares the outcome $Y$ under the treatment $A = 1$ to the outcome under no treatment $A = 0$, keeping the mediator $M$ fixed at its natural level when $A = 0$. In this analysis, the NDE represents how manganese exposure directly impacts cognitive scores, independent of its effect through birth length. When assuming no exposure-mediator interaction, NDE was negative (-0.356) but it was not statistically significant (p-value = 0.164). When accounting for exposure-mediator interaction, NDE was also negative (-0.453) but it was not statistically significant (p-value = 0.0823)
+- Natural indirect effect (NIE): The NIE compares the outcome under $A = 1$ where the mediator $M$ takes its natural value under $A = 1$, to the outcome under $A = 1$ where the mediator is set to its natural value under $A = 0$. In this analysis, the NIE quantifies the mediated pathway, i.e., the effect of manganese on cognitive scores that operates through birth length. When assuming no exposure-mediator interaction, this effect was significant (p-value <0.01) with an estimate of -0.295, indicating that shorter birth lengths associated with higher manganese exposure negatively impact cognitive outcomes. This trend persisted when accounting for exposure-mediator interaction (estimate: -0.392, p-value <0.01)
+- Total effect: The TE is the overall effect of changing the treatment from $A = 0$ to $A = 1$, which is decomposable into NDE + NIE. In this analysis, the TE was significant (p-value <0.01) with an estimate of -0.747, confirming that increased manganese exposure reduces cognitive scores  
+- In summary, the above results suggests that the mediator explains a substantial part of the observed total effect
+
+The following identifiability assumptions are necessary for the causal interpretation: 
+
+- $Y_{am} \perp A \ | \ C$: No unmeasured confounders affect the relationship between exposure $A$ and outcome $Y$ after adjusting for covariates $C$
+- $Y_{am} \perp M \ | \ C, A$: No unmeasured confounders influence the relationship between the mediator $M$ and outcome $Y$, conditional on exposure and covariates
+- $M_a \perp A \ | \ C$: No unmeasured confounders affect the relationship between exposure $A$ and mediator $M$ after adjusting for covariates
+- $Y_{am} \perp M_{a*} \ | \ C$: No effect of exposure $A$ that confounds the mediator $M$ and outcome $Y$ relationship
+
+
+# 3. Other measures of fetal growth
+(a) Causal DAG  
+Exposure: Manganese levels in the mother ($A$)   
+Mediator: Birth length ($M_1$), additional fetal growth measurement such as birthweight ($M_2$)    
+Outcome: Cognitive score ($Y$)    
+Covariates: Potential confounders such as maternal age, sex of the child, and protein intake ($C$)  
+
+Below is the DAG with the additional measurements of fetal growth:
+```{r}
+# DAG
+g = dagitty('dag {
+A [pos="-1.675,-0.260"]
+C [pos="-0.451,-1.098"]
+M1 [pos="-0.755,-0.588"]
+M2 [pos="0.064,0.058"]
+Y [pos="0.833,-0.390"]
+A -> M1
+A -> M2
+A -> Y
+C -> A
+C -> M1
+C -> M2
+C -> Y
+M1 -> Y
+M1 <-> M2
+M2 -> Y
+}')
+
+plot(g)
+```
+
+(b) Adjustment of birthweight and identifiability assumption
+Adjustment of birthweight ($M_2$) could lead to a violation of the fourth identifiability assumption if it induces collider bias or blocks a portion of the causal pathway.  
+In this context, $M_2$ is likely to be a collider as birthweight could be affected by maternal age, sex of the child, and protein intake. Birthweight might also mediate the relationship independently or jointly with birth length. By adjusting for birthweight, indirect effect might be partially removed, violating the decomposition of total effects into direct and indirect effects.
+

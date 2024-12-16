@@ -17,7 +17,10 @@ library(tidyverse)
 library(ggplot2)
 library(readr)
 library(dagitty)
+library(tableone)
 library(knitr)
+library(boot)
+library(survey)
 
 # install.packages("remotes")
 # remotes::install_github("LindaValeri/CMAverse")
@@ -32,17 +35,315 @@ theme_set(
 
 ```{r}
 # import data
-df = read.table("./data/datafinal.txt", header = T)
+df = read.table("./data/datafinal.txt", header = T) |> 
+  dplyr::mutate(
+    gender = as.factor(gender),
+    plural = as.factor(plural),
+    race = as.factor(race),
+    parity = as.factor(parity), 
+    married = as.factor(married),
+    firstep = as.factor(firstep),
+    welfare = as.factor(welfare),
+    smoker = as.factor(smoker),
+    drinker = as.factor(drinker)
+  )
 ```
 
 # 1 
 ## a
+The estimand of interest is the causal effect of smoking during pregnancy on gestational age. In other words, it is an average difference in gestational age between pregnant individuals who smoke and those who do not smoke.  
+
+Assumptions: 
+
+- Consistency: The observed gestational age for each mother corresponds to the actual smoking status during pregnancy (i.e., the recorded smoking status is correct and there is no error in measurement)     
+- No unmeasured confounding: All confounding factors affecting both smoking and gestational age are measured and accounted for       
+- Positivity: All individuals in the data have a positive probability of belonging to either the smoking or nonsmoking group, given the measured covariates         
+- SUTVA: Exposure (smoking status) is well defined and there is only one version of potential; one mother's smoking status does not affect another mother's gestational age    
+
+To evaluate these assumptions, I will first use domain knowledge to identify the confounders and adjust them in the statistical analysis. I will also check the distribution of covariates by smoking status to ensure that there are enough smokers and nonsmokers at each level of the confounding variable.
 
 ## b
+```{r}
+# DAG
+g = dagitty('dag {
+age [pos="-0.106,-0.624"]
+bwt [pos="0.967,-0.413"]
+drinkN [pos="-1.047,0.336"]
+drinker [pos="-1.604,0.146"]
+education [pos="-1.467,0.668"]
+firstep [pos="0.115,0.533"]
+gender [pos="-0.500,-0.752"]
+gestation [outcome,pos="0.651,-0.124"]
+married [pos="-0.588,0.438"]
+parity [pos="-1.299,-0.526"]
+plural [pos="0.378,-0.599"]
+race [pos="-0.857,-0.646"]
+smokeN [pos="-1.556,-0.369"]
+smoker [exposure,pos="-1.052,-0.106"]
+welfare [pos="0.567,0.515"]
+wgain [pos="-0.221,0.679"]
+wpre [pos="-0.726,0.664"]
+age -> gestation
+age -> smoker
+drinkN -> gestation
+drinker -> drinkN
+drinker -> gestation
+drinker -> smoker
+education -> gestation
+education -> smoker
+firstep -> gestation
+firstep -> smoker
+gestation -> bwt
+married -> gestation
+married -> smoker
+parity -> gestation
+plural -> gestation
+race -> gestation
+race -> smoker
+smokeN -> gestation
+smoker -> bwt
+smoker -> gestation
+smoker -> parity
+smoker -> smokeN
+smoker -> wgain
+smoker -> wpre
+welfare -> gestation
+welfare -> smoker
+wgain -> gestation
+wpre -> gestation
+}')
+
+plot(g)
+```
+`gender`: Maternal smoking status does not influence the infant's gender, and the infant's gender does not affest gestational age.       
+`plural`: Maternal smoking status does not influence singleton/twin/triplet pregnancy, and the number of child carriage affect gestational age.    
+`age`: Potential confounder. Depending on the mother's generation, smoking prevalence varies and maternal age also influence the gestational age.    
+`race`: Potential confounder. There is a racial difference in smoking prevalence and maternal race also affects gestational age.  
+`parity`: Potential mediator. Smokers may be more likely to have multiple parity and parity also affects gestational age.  
+`married`: Potential confounder. Married people may be more likely to be a non-smoker, and marriage status may impact gestational age.  
+`bwt`: Potential collider. Both smoking status and gestational age impacts birth weight.  
+`smokeN`: Potential mediator. Smoking status impacts number of cigarettes smoked per day during pregnancy, and `smokeN` affects gestational age.  
+`drinkN`: This is in the backdoor path. Drinking state affects number of alcoholic drinks per week during pregnancy, and `drinkN` also affects gestational age.  
+`firstep`: Potential confounder. The participation influences both smoking status and gestational age.  
+`welfare`: Potential confounder. The participation influences both smoking status and gestational age.  
+`smoker`: Exposure.  
+`drinker`: Potential confounder. Drinkers are more likely to smoke and drinking status affects gestational age.  
+`wpre`: Potential mediator. Smoking status affects mother's weight in pounds prior to pregnancy, and `wpre` also affects gestational age.  
+`wgain`: Potential mediator. Smoking status affects mother's weight gain in pounds during pregnancy, and `wgain` also affects gestational age.    
+`education`: Potential confounder.  
+`gestation`: Outcome.  
+
+In addition, I think potential confounders includes income, residential area, working place, etc.  
+In order to satisty the first and second principles of causal inference, in this data, we need to block all backdoor paths to eliminate confounding (adjust for `age`, `drinker`, `education`, `firstep`, `married`, `race`, `welfare`), and avoid adjusting for mediators (`smokeN`, `parity`, `drinkN`, `wpre`, `wgain`) and colliders (`bwt`). 
 
 ## c
+```{r}
+covariates <- c("age", "drinker", "education", "firstep", "married", "race", "welfare")
+exposure <- "smoker" 
+outcome <- "gestation"
+
+# create table to check balance
+tb <- CreateTableOne(vars = covariates, strata = exposure, data = df, test = FALSE)
+print(tb, smd = TRUE) # Show standardized mean differences
+```
+
+Given SMD >0.1, all the selected covariates are imbalanced between the two smoking groups, indicating that adjustment of these covariates are required in the later analysis to estimate smoking's causal effect on gestational age.   
+
+```{r fig.height=3, fig.width=3}
+# check overlap in covariates
+for (cov in covariates) {
+  if (is.numeric(df[[cov]])) {  # for numeric covariates, create histogram
+    p <- ggplot(df, aes_string(x = cov, fill = "smoker")) +
+      geom_histogram(position = "identity", alpha = 0.6) +
+      labs(title = paste(cov),
+           x = cov, fill = "smoker")
+  } else {  # for categorical covariates, create bar plots
+    p <- ggplot(df, aes_string(x = cov, fill = "smoker")) +
+      geom_bar(position = "identity", alpha = 0.6) +  
+      labs(title = paste(cov),
+           x = cov, y = "proportion", fill = "smoker")
+  }
+  print(p)
+}
+```
+
+There is sufficient overlap between smokers and non-smokers in `firstep`, `married`, `race`, `welfare` and the positivity assumption appears to be met for those covariates. We see some potential violation in `age` <18 and >38, `education` <8 and >18, and `drinker`.  
+We cannot evaluate SUTVA due to the lack of information on how `smoker` was determined. 
 
 ## d
+Given (c), I will set the eligibility as below:
+
+- Mother aged 17-37
+- Those who had 7-17 years of education     
+- Does not drink 
+```{r}
+# filter by the above criteria
+df_d = df |> 
+  filter(
+    age >= 17 & age <= 27,
+    education >= 7 & education <= 17,
+    drinker == "N"
+  )
+```
+
+Direct regression adjustment:
+```{r}
+reg <- lm(gestation ~ smoker + age + education + firstep + married + race + welfare, data = df_d)
+
+summary(reg)
+
+# extract coefficient and 95% CI for smoker
+effect <- coef(summary(reg))["smokerY", ]
+ci <- confint(reg, "smokerY", level = 0.95)
+cat("Estimated ACE:", round(effect[1], 2), 
+    "\n95% CI:", round(ci[1], 2), "to", round(ci[2], 2), "\n")
+```
+
+All else being equal, in the eligible population, the point estimate of ACE suggests that smoking during pregnancy is associated with a reduction of approximately 0.09 weeks in gestational age but 95% CI indicates that this is not statistically significant.
+
+Propensity score weighting approach:  
+I will fit logisting regression with the covariates (`age`, `education`, `firstep`, `married`, `race`, `welfare`) to estimate the propensity score. 
+```{r}
+# ps estimation
+ps_est <- glm(smoker ~ age + education + firstep + married + race + welfare, data = df_d,  family = binomial(logit))
+
+# propensity scores
+df_d$ps <- predict(ps_est, type = "response")
+
+# visualize propensity scores
+ggplot(df_d, aes(x = ps, fill = smoker)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 30, alpha = 0.3, position = "identity") +  # Histogram
+  geom_density(aes(color = smoker), alpha = 0.3, size = 1) +  # Density plot
+  scale_fill_manual(
+    values = c("#F8766D", "#00BFC4"), 
+    name = "Smoking Status", 
+    labels = c("No", "Yes"),
+    guide = guide_legend(override.aes = list(color = NA))
+  ) + 
+  scale_color_manual(
+    values = c("#F8766D", "#00BFC4"), 
+    guide = "none"
+  ) +  
+  geom_rug(aes(color = smoker), sides = "b", alpha = 0.5) +  # Rug plot
+  labs(
+    title = "Distribution of Propensity Scores by Smoking Status",
+    x = "Propensity Score",
+    y = "Density"
+  ) 
+```
+
+There is a clear lack of overlap for propensity scores greater than 0.4. Therefore, I will trim the observations with PS >0.4. 
+
+```{r}
+df_trimmed <- df_d |> 
+  filter(ps <= 0.4)
+
+# verify the overlap again
+ggplot(df_trimmed, aes(x = ps, fill = smoker)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 30, alpha = 0.3, position = "identity") +  # Histogram
+  geom_density(aes(color = smoker), alpha = 0.3, size = 1) +  # Density plot
+  scale_fill_manual(
+    values = c("#F8766D", "#00BFC4"), 
+    name = "Smoking Status", 
+    labels = c("No", "Yes"),
+    guide = guide_legend(override.aes = list(color = NA))
+  ) + 
+  scale_color_manual(
+    values = c("#F8766D", "#00BFC4"), 
+    guide = "none"
+  ) +  
+  geom_rug(aes(color = smoker), sides = "b", alpha = 0.5) +  # Rug plot
+  labs(
+    title = "Distribution of Propensity Scores by Smoking Status",
+    x = "Propensity Score",
+    y = "Density"
+  ) 
+```
+
+Now, propensity scores largely overlap between the two groups and probabilistic assumption is mostly satisfied. 
+
+```{r}
+# covariate balance
+covariates <- c("age", "education", "firstep", "married", "race", "welfare")
+table1 <- CreateTableOne(vars = covariates, strata = "smoker", data = df_trimmed, test = FALSE)
+
+# SMD before adjustment
+print(table1, smd = TRUE)
+```
+
+We can see that the covariates are significantly imbalanced between the two groups except for `welfare`. Now, I will calculate the stabilized weights ($w_i=\frac{P(T=t)}{P(T=t|X_i)}$, where $T$ is smoker = Y or N):
+```{r}
+# calculate the marginal probability of smoking (P(T = Y))
+p_treated <- mean(df_trimmed$smoker == "Y")
+
+# calculate stabilized weights
+df_trimmed$w_stb <- ifelse(
+  df_trimmed$smoker == "Y",
+  p_treated / df_trimmed$ps,          # For smokers
+  (1 - p_treated) / (1 - df_trimmed$ps)  # For non-smokers
+)
+
+# plot
+ggplot(df_trimmed, aes(x = w_stb)) +
+geom_histogram(binwidth = 0.3, fill = "#00BFC4", color = "black", alpha = 0.7) + labs(
+    title = "Histogram of Weights (w)",
+    x = "Weight (w)",
+    y = "Frequency"
+)
+```
+
+Finally, I will use bootstrap to estimate the marginal ACE of smoking status on gestational age. 
+```{r}
+# bootstrapping parameters
+boots <- 100
+b.holder <- rep(NA, boots)
+n <- nrow(df_trimmed)
+set.seed(2024)
+
+# marginal probability of smoking (stabilized weights)
+p_treated <- mean(df_trimmed$smoker == "Y")
+
+for (i in 1:boots) {
+  # resample data with replacement
+  S.b <- sample(1:n, size = n, replace = TRUE)
+  data.b <- df_trimmed[S.b, ]
+
+  # fit the propensity score model on the bootstrap sample
+  ps_model <- glm(smoker ~ age + education + firstep + married + race + welfare,
+                  data = data.b, family = binomial(logit))
+
+  # predict propensity scores
+  data.b$ps <- predict(ps_model, type = "response")
+
+  # calculate stabilized weights
+  data.b$w_stb <- ifelse(
+    data.b$smoker == "Y",
+    p_treated / data.b$ps,  # For smokers
+    (1 - p_treated) / (1 - data.b$ps)  # For non-smokers
+  )
+
+  # fit a MSM using weighted regression
+  design.b <- svydesign(~1, weights = ~w_stb, data = data.b)
+  msm_model <- svyglm(gestation ~ smoker, design = design.b)
+
+  # store the estimated coefficient for smoking
+  b.holder[i] <- coef(msm_model)["smokerY"]
+}
+
+# calculate the mean and 95% confidence interval
+mean_marginal <- mean(b.holder)
+ci_marginal <- quantile(b.holder, probs = c(0.025, 0.975))
+
+# display results
+list(
+  Marginal_Effect = list(
+    Estimate = round(mean_marginal, 3),
+    CI = round(ci_marginal, 3)
+  )
+)
+```
+
+Given the results above, MACE -0.666 suggests that smoking during pregnancy is associated with a reduction of approximately 0.67 weeks in gestational age but 95% CI indicates that this is not statistically significant.
 
 ## e
 

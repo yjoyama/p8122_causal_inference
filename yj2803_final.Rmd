@@ -167,8 +167,8 @@ for (cov in covariates) {
 }
 ```
 
-There is sufficient overlap between smokers and non-smokers in `firstep`, `married`, `race`, `welfare` and the positivity assumption appears to be met for those covariates. We see some potential violation in `age` <18 and >38, `education` <8 and >18, and `drinker`.  
-We cannot evaluate SUTVA due to the lack of information on how `smoker` was determined. 
+There is sufficient overlap between smokers and non-smokers in `firstep`, `married`, `race`, `welfare` and the positivity assumption appears to be met for those covariates. We see some potential violation in `age` <18 and >38, `education` <8 and >18, and `drinker`.    
+In addition the SUTVA assumption may be violated. Because of the high participation rates in the “First Steps” program throughout King County, WA, it is possible that those who did not participate in the program were also surrounded by participants with better care knowledge that influenced their preterm birth behavior (i.e., spillover effects).
 
 ## d
 Given (c), I will set the eligibility as below:
@@ -346,10 +346,32 @@ list(
 Given the results above, MACE -0.666 suggests that smoking during pregnancy is associated with a reduction of approximately 0.67 weeks in gestational age but 95% CI indicates that this is not statistically significant.
 
 ## e
+I will used the same trimmed data to examine unadjusted association between smoking status and gestational age as follows:
+```{r}
+# simple linear regression
+reg <- lm(gestation ~ smoker, data = df_trimmed)
+
+summary(reg)
+
+# extract point estimate and confidence intervals
+effect <- coef(summary(reg))["smokerY", "Estimate"]
+ci <- confint(reg, "smokerY", level = 0.95)
+
+# results
+cat("Unadjusted Point Estimate:", round(effect, 2), "\n")
+cat("95% CI:", round(ci[1], 2), "to", round(ci[2], 2), "\n")
+```
+
+The unadjusted association suggests that smokers have, on average, a gestational age 0.43 weeks shorter compared to non-smokers. However, 95%CI indicates that this is not statistically significant.   
+
+All methods in (d) and (e) consistently suggest that smoking during pregnancy is associated with a reduction in gestational age, but the effect is not statistically significant. 
 
 ## f
+Initially, the positivity assumption appeared to be violated. I tried to mitigate this by trimming extreme propensity scores and using stabilized weights in the propensity score weighting approach. However, as mentioned in (b) and (c), the presence of unmeasured confounders and potential SUTVA violation in this study may lead to biased causal effect estimates. 
 
 ## g
+The population of interest is all pregnant individuals, but the sample at hand is limited to singleton births in King County, WA, in 2001, with many mothers participating in the First Steps program. During the analysis, I excluded some additional individuals to meet causal assumptions. This sampling scheme and analysis method limits generalizability by excluding multiple births and individuals with extreme propensity scores. Therefore, the observed MACE is only valid among the individuals included in the analysis.  
+Excluding multiple births, which are inherently at higher risk of preterm birth, may underestimate the overall effect of smoking on gestational age. Additionally, as discussed in (c) SUTVA violation, the spillover effect may also underestimate the effect of smoking. Therefore, the observed MACE may be biased towards the null and careful interpretation is required.   
 
 # 2 
 ## a

@@ -454,23 +454,130 @@ plot(g)
 `parity`: Potential mediator. Smokers may be more likely to have multiple parity and parity also affects gestational age.  
 `married`: **Potential exposure-outcome confounder**. Married people may be more likely to be a non-smoker, and marriage status may impact gestational age.  
 `bwt`: Potential collider. Smoking status, maternal weight gain and gestational age impacts birth weight.  
-`smokeN`: **Potential outcome-mediator confounder**. Smoking status impacts number of cigarettes smoked per day during pregnancy, and `smokeN` affects maternal weight gain and gestational age.  
+`smokeN`: **Potential mediator-outcome confounder**. Smoking status impacts number of cigarettes smoked per day during pregnancy, and `smokeN` affects maternal weight gain and gestational age.  
 `drinkN`: **Potential confounder for exposure, mediator and outcome**. Drinking state affects number of alcoholic drinks per week during pregnancy, and `drinkN` also affects smoking status, maternal weight gain, and gestational age.  
 `firstep`: **Potential confounder for exposure, mediator and outcome**. The participation influences smoking status, maternal weight gain, and gestational age.  
 `welfare`: **Potential confounder for exposure, mediator and outcome**. The participation influences both smoking status and gestational age.  
 `drinker`: **Potential confounder for exposure, mediator and outcome**. Drinkers are more likely to smoke, gain weight during the pregnancy and it affects gestational age.  
-`wpre`: **Potential outcome-mediator confounder**. Smoking status affects mother's weight in pounds prior to pregnancy, and `wpre` affects both maternal weight gain and gestational age.  
+`wpre`: **Potential mediator-outcome confounder**. Smoking status affects mother's weight in pounds prior to pregnancy, and `wpre` affects both maternal weight gain and gestational age.  
 `education`: **Potential confounder for exposure, mediator and outcome**. Education years are likely to influence smoking status, maternal weight gain, and gestational age.    
 
-## b
+## b 
+Given (a), the confounder for `smoker` and `wgain` are: `age`, `race`, `drinkN`, `firstep`, `welfare`, `drinker`, and `education`.  
+I will estimate the effect of smoking on maternal weight gain using direct regression confounding adjustment using data with inclusion criteria sepcified in 1-(d). Hence, covariates does not include drinking-related variables. 
+```{r}
+fit1 <- lm(wgain ~ smoker + age + race + firstep + welfare + education, data = df_d)
+
+summary(fit1)
+
+# extract coefficient and 95% CI 
+effect <- coef(summary(fit1))["smokerY", ]
+ci <- confint(fit1, "smokerY", level = 0.95)
+cat("Estimated ACE:", round(effect[1], 2), 
+    "\n95% CI:", round(ci[1], 2), "to", round(ci[2], 2), "\n")
+```
+
+All else being equal, in the eligible population, the point estimate of ACE suggests that smoking during pregnancy is associated with a reduction of approximately 0.15 pound in maternal weight but 95% CI indicates that this is not statistically significant.
 
 ## c
+Given (a), the confounder for `wgain` and `gestation` are: `smokeN`, `wpre`, `age`, `race`, `firstep`, `welfare`, and `education` (`plural` has only one type in this study so it's not included in the covariates).  
+I will estimate the effect of weight gain on gestational age using direct regression confounding adjustment using data with inclusion criteria sepcified in 1-(d). 
+```{r}
+fit2 <- lm(gestation ~ wgain + smokeN + wpre + age + race + firstep + welfare + education, data = df_d)
+
+summary(fit2)
+
+# extract coefficient and 95% CI 
+effect <- coef(summary(fit2))["wgain", ]
+ci <- confint(fit2, "wgain", level = 0.95)
+cat("Estimated ACE:", round(effect[1], 2), 
+    "\n95% CI:", round(ci[1], 2), "to", round(ci[2], 2), "\n")
+```
+
+All else being equal, in the eligible population, the point estimate of ACE suggests that one unit of increase in maternal weight (= 1 pound) is associated with an increase of approximately 0.02 weeks in gestational age. Given 95% CI, this is statistically significant. 
 
 ## d
+Given (a), the confounder for `wgain`, `smoker` and `gestation` are:`married`, `smokeN`, `wpre`, `age`, `race`, `firstep`, `welfare`, and `education` 
+I will estimate the effect of weight gain on gestational age using direct regression confounding adjustment using data with inclusion criteria sepcified in 1-(d). 
+```{r}
+fit3 <- lm(gestation ~ smoker*wgain + married + smokeN + wpre + age + race + firstep + welfare + education, data = df_d)
+
+summary(fit3)
+
+# extract coefficient and 95% CI 
+effect <- coef(summary(fit3))["smokerY", ]
+ci <- confint(fit3, "smokerY", level = 0.95)
+cat("Estimated ACE:", round(effect[1], 2), 
+    "\n95% CI:", round(ci[1], 2), "to", round(ci[2], 2), "\n")
+
+effect <- coef(summary(fit3))["wgain", ]
+ci <- confint(fit3, "wgain", level = 0.95)
+cat("Estimated ACE:", round(effect[1], 2), 
+    "\n95% CI:", round(ci[1], 2), "to", round(ci[2], 2), "\n")
+
+effect <- coef(summary(fit3))["smokerY:wgain", ]
+ci <- confint(fit3, "smokerY:wgain", level = 0.95)
+cat("Estimated ACE:", round(effect[1], 2), 
+    "\n95% CI:", round(ci[1], 2), "to", round(ci[2], 2), "\n")
+```
+
+- All else being equal, in the eligible population, the point estimate of ACE suggests that smoking during pregnancy is associated with an increase of approximately 0.71 weeks in maternal weight but 95% CI indicates that this is not statistically significant
+- All else being equal, in the eligible population, the point estimate of ACE suggests that one unit of increase in maternal weight (= 1 pound) is associated with a increase of approximately 0.02 weeks in gestational age. Given 95% CI, this is statistically significant
+- All else being equal, in the eligible population, for smokers, the positive effect of weight gain on gestational age is slightly reduced by 0.01 pounds weight gain compared to non-smokers, but 95% CI indicates that this is not statistically significant
 
 ## e
+Covariates: `married`, `smokeN`, `wpre`, `age`, `race`, `firstep`, `welfare`, and `education` 
 
-## f
+I will estimate causal effects using the following code:
+```{r}
+med_result = cmest(
+  data = df_d,
+  model = "rb", # regression-based approach
+  outcome = "gestation",
+  exposure = "smoker",
+  mediator = "wgain",
+  basec = c("married", "smokeN", "wpre", "age", "race", "firstep", "welfare", "education"),
+  EMint = TRUE,  # allow exposure-mediator interaction
+  mreg = list(type = "linear"),  
+  yreg = "linear", 
+  estimation = "paramfunc",
+  inference = "delta",
+  full = FALSE,
+  astar = "N", # reference value
+  a = "Y", 
+  mval = list(1)
+)
+
+summary(med_result)
+
+# visualization
+ggcmest(med_result) +
+ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 30, vjust = 0.8))
+```
+
+- Pure natural direct effect (PNDE): 0.383 (95%CI -0.449, 1.214)
+- Total natural direct effect (TNDE): 0.337 (95%CI -0.474, 1.147)
+- Pure natural indirect effect (PNIE): 0.103 (95%CI -0.0195, 0.226)
+- Total natural indirect effect (TNIE): 0.0571 (95%CI -0.0832, 0.197) 
+- Total effect: 0.440 (95%CI -0.373, 1.252)
+
+# f  
+- Natural direct effect (NDE): In this analysis, the NDE represents how smoking status directly impacts gestational age, independent of its effect through maternal weight gain. When assuming no exposure-mediator interaction, NDE was 0.383 but it was not statistically significant. When accounting for exposure-mediator interaction, NDE was 0.377 but it was not statistically significant
+- Natural indirect effect (NIE): In this analysis, the NIE quantifies the mediated pathway, i.e., the effect of smoking status on gestational age that operates through maternal weight gain. When assuming no exposure-mediator interaction, NIE was 0.103 but it was not statistically significant. When accounting for exposure-mediator interaction, NIE was 0.0571 but it was not statistically significant
+- Total effect: TE is decomposable into NDE + NIE. In this analysis, the TE was 0.440 but not statistically significant  
+
+The following identifiability assumptions are necessary for the causal interpretation: 
+
+- $Y_{am} \perp A \ | \ C$: No unmeasured confounders affect the relationship between exposure $A$ and outcome $Y$ after adjusting for covariates $C$  
+Some unmeasured factors, like income, or residential location, could still confound this relationship.
+- $Y_{am} \perp M \ | \ C, A$: No unmeasured confounders influence the relationship between the mediator $M$ and outcome $Y$, conditional on exposure and covariates  
+Pre-pregnancy health status (e.g., comorbidities) might confound the weight gain-gestational age relationship but were not explicitly adjusted for.
+- $M_a \perp A \ | \ C$: No unmeasured confounders affect the relationship between exposure $A$ and mediator $M$ after adjusting for covariates  
+Unmeasured factors like stress or working hours might confound the exposure-mediator relationship.
+- $Y_{am} \perp M_{a*} \ | \ C$: No effect of exposure $A$ that confounds the mediator $M$ and outcome $Y$ relationship  
+Smoking may indirectly influence gestational age through other pathway, such as mother's weight in pounds prior to pregnancy.
+
+In summary, there is no statistically significant evidence to support either a direct or mediated effect of smoking status on gestational age. However, the validity of the causal interpretation is weakened by the above identifiability assumption violations. 
 
 
 

@@ -115,30 +115,30 @@ wpre -> gestation
 
 plot(g)
 ```
+`smoker`: Exposure.  
+`gestation`: Outcome.  
 `gender`: Maternal smoking status does not influence the infant's gender, and the infant's gender does not affest gestational age.       
 `plural`: Maternal smoking status does not influence singleton/twin/triplet pregnancy, and the number of child carriage affect gestational age.    
-`age`: Potential confounder. Depending on the mother's generation, smoking prevalence varies and maternal age also influence the gestational age.    
-`race`: Potential confounder. There is a racial difference in smoking prevalence and maternal race also affects gestational age.  
+`age`: **Potential confounder**. Depending on the mother's generation, smoking prevalence varies and maternal age also influence the gestational age.    
+`race`: **Potential confounder**. There is a racial difference in smoking prevalence and maternal race also affects gestational age.  
 `parity`: Potential mediator. Smokers may be more likely to have multiple parity and parity also affects gestational age.  
-`married`: Potential confounder. Married people may be more likely to be a non-smoker, and marriage status may impact gestational age.  
+`married`: **Potential confounder**. Married people may be more likely to be a non-smoker, and marriage status may impact gestational age.  
 `bwt`: Potential collider. Both smoking status and gestational age impacts birth weight.  
 `smokeN`: Potential mediator. Smoking status impacts number of cigarettes smoked per day during pregnancy, and `smokeN` affects gestational age.  
-`drinkN`: This is in the backdoor path. Drinking state affects number of alcoholic drinks per week during pregnancy, and `drinkN` also affects gestational age.  
-`firstep`: Potential confounder. The participation influences both smoking status and gestational age.  
-`welfare`: Potential confounder. The participation influences both smoking status and gestational age.  
-`smoker`: Exposure.  
-`drinker`: Potential confounder. Drinkers are more likely to smoke and drinking status affects gestational age.  
+`drinkN`: **Potential confounder**. Drinking state affects number of alcoholic drinks per week during pregnancy, and `drinkN` also affects both smoking status and gestational age.  
+`firstep`: **Potential confounder**. The participation influences both smoking status and gestational age.  
+`welfare`: **Potential confounder**. The participation influences both smoking status and gestational age.  
+`drinker`: **Potential confounder**. Drinkers are more likely to smoke and drinking status affects gestational age.  
 `wpre`: Potential mediator. Smoking status affects mother's weight in pounds prior to pregnancy, and `wpre` also affects gestational age.  
 `wgain`: Potential mediator. Smoking status affects mother's weight gain in pounds during pregnancy, and `wgain` also affects gestational age.    
-`education`: Potential confounder.  
-`gestation`: Outcome.  
+`education`: **Potential confounder**. Education years are likely to influence smoking status and gestational age.   
 
 In addition, I think potential confounders includes income, residential area, working place, etc.  
-In order to satisty the first and second principles of causal inference, in this data, we need to block all backdoor paths to eliminate confounding (adjust for `age`, `drinker`, `education`, `firstep`, `married`, `race`, `welfare`), and avoid adjusting for mediators (`smokeN`, `parity`, `drinkN`, `wpre`, `wgain`) and colliders (`bwt`). 
+In order to satisty the first and second principles of causal inference, in this data, we need to block all backdoor paths to eliminate confounding (adjust for `age`, `drinker`, `drinkN`, `education`, `firstep`, `married`, `race`, `welfare`), and avoid adjusting for mediators (`smokeN`, `parity`, `drinkN`, `wpre`, `wgain`) and colliders (`bwt`). 
 
 ## c
 ```{r}
-covariates <- c("age", "drinker", "education", "firstep", "married", "race", "welfare")
+covariates <- c("age", "drinker", "drinkN", "education", "firstep", "married", "race", "welfare")
 exposure <- "smoker" 
 outcome <- "gestation"
 
@@ -147,7 +147,7 @@ tb <- CreateTableOne(vars = covariates, strata = exposure, data = df, test = FAL
 print(tb, smd = TRUE) # Show standardized mean differences
 ```
 
-Given SMD >0.1, all the selected covariates are imbalanced between the two smoking groups, indicating that adjustment of these covariates are required in the later analysis to estimate smoking's causal effect on gestational age.   
+Given SMD >0.1, all the selected covariates edcluding `drinkN` are imbalanced between the two smoking groups, indicating that adjustment of these covariates are required in the later analysis to estimate smoking's causal effect on gestational age.   
 
 ```{r fig.height=3, fig.width=3}
 # check overlap in covariates
@@ -167,14 +167,14 @@ for (cov in covariates) {
 }
 ```
 
-There is sufficient overlap between smokers and non-smokers in `firstep`, `married`, `race`, `welfare` and the positivity assumption appears to be met for those covariates. We see some potential violation in `age` <18 and >38, `education` <8 and >18, and `drinker`.    
+There is sufficient overlap between smokers and non-smokers in `firstep`, `married`, `race`, `welfare` and the positivity assumption appears to be met for those covariates. We see some potential violation in `age` <18 and >38, `education` <8 and >18, `drinkN` and `drinker`.    
 In addition the SUTVA assumption may be violated. Because of the high participation rates in the “First Steps” program throughout King County, WA, it is possible that those who did not participate in the program were also surrounded by participants with better care knowledge that influenced their preterm birth behavior (i.e., spillover effects).
 
 ## d
 Given (c), I will set the eligibility as below:
 
 - Mother aged 17-37
-- Those who had 7-17 years of education     
+- Those who had 7-17 years of education
 - Does not drink 
 ```{r}
 # filter by the above criteria
@@ -374,7 +374,93 @@ The population of interest is all pregnant individuals, but the sample at hand i
 Excluding multiple births, which are inherently at higher risk of preterm birth, may underestimate the overall effect of smoking on gestational age. Additionally, as discussed in (c) SUTVA violation, the spillover effect may also underestimate the effect of smoking. Therefore, the observed MACE may be biased towards the null and careful interpretation is required.   
 
 # 2 
-## a
+In this section, I will investigate whether the effect of smoking on gestational age is mediated by maternal weight gain during pregnancy. 
+
+## a 
+
+```{r}
+# DAG
+g = dagitty('dag {
+age [pos="-0.106,-0.624"]
+bwt [pos="0.826,-0.425"]
+drinkN [pos="-0.943,0.400"]
+drinker [pos="-1.548,0.221"]
+education [pos="-1.173,0.231"]
+firstep [pos="0.236,0.418"]
+gender [pos="-0.408,-0.717"]
+gestation [outcome,pos="0.651,-0.124"]
+married [pos="-0.588,0.438"]
+parity [pos="-1.223,-0.511"]
+plural [pos="0.461,-0.537"]
+race [pos="-0.738,-0.582"]
+smokeN [pos="-1.556,-0.369"]
+smoker [exposure,pos="-1.052,-0.106"]
+welfare [pos="0.541,0.286"]
+wgain [pos="-0.194,-0.121"]
+wpre [pos="-0.159,0.423"]
+age -> gestation
+age -> smoker
+age -> wgain
+drinkN -> gestation
+drinkN -> smoker
+drinkN -> wgain
+drinker -> drinkN
+drinker -> gestation
+drinker -> smoker
+drinker -> wgain
+education -> gestation
+education -> smoker
+education -> wgain
+firstep -> gestation
+firstep -> smoker
+firstep -> wgain
+gestation -> bwt
+married -> gestation
+married -> smoker
+married -> wgain
+parity -> gestation
+plural -> gestation
+plural -> wgain
+race -> gestation
+race -> smoker
+race -> wgain
+smokeN -> gestation
+smokeN -> wgain
+smoker -> bwt
+smoker -> gestation [pos="-0.239,-0.403"]
+smoker -> parity
+smoker -> smokeN
+smoker -> wgain
+smoker -> wpre
+welfare -> gestation
+welfare -> smoker
+welfare -> wgain
+wgain -> bwt
+wgain -> gestation
+wpre -> gestation
+wpre -> wgain
+}
+')
+
+plot(g)
+```
+`smoker`: Exposure.  
+`gestation`: Outcome.  
+`wgain`: Potential mediator.  
+`gender`: Maternal smoking status does not influence the infant's gender, and the infant's gender does not affest gestational age. Gender is not associated with `wgain`, either.   
+`plural`: **Potential mediator-outcome confounder**. Maternal smoking status does not influence singleton/twin/triplet pregnancy, and the number of child carriage affect `wgain` and gestational age.    
+`age`: **Potential confounder for exposure, mediator and outcome**. Depending on the mother's generation, smoking prevalence varies, the magnitude of weight gain changes, and it also influence the gestational age.    
+`race`: **Potential confounder for exposure, mediator and outcome**. There is a racial difference in smoking prevalence, maternal weight gain and gestational age.  
+`parity`: Potential mediator. Smokers may be more likely to have multiple parity and parity also affects gestational age.  
+`married`: **Potential exposure-outcome confounder**. Married people may be more likely to be a non-smoker, and marriage status may impact gestational age.  
+`bwt`: Potential collider. Smoking status, maternal weight gain and gestational age impacts birth weight.  
+`smokeN`: **Potential outcome-mediator confounder**. Smoking status impacts number of cigarettes smoked per day during pregnancy, and `smokeN` affects maternal weight gain and gestational age.  
+`drinkN`: **Potential confounder for exposure, mediator and outcome**. Drinking state affects number of alcoholic drinks per week during pregnancy, and `drinkN` also affects smoking status, maternal weight gain, and gestational age.  
+`firstep`: **Potential confounder for exposure, mediator and outcome**. The participation influences smoking status, maternal weight gain, and gestational age.  
+`welfare`: **Potential confounder for exposure, mediator and outcome**. The participation influences both smoking status and gestational age.  
+`drinker`: **Potential confounder for exposure, mediator and outcome**. Drinkers are more likely to smoke, gain weight during the pregnancy and it affects gestational age.  
+`wpre`: **Potential outcome-mediator confounder**. Smoking status affects mother's weight in pounds prior to pregnancy, and `wpre` affects both maternal weight gain and gestational age.  
+`education`: **Potential confounder for exposure, mediator and outcome**. Education years are likely to influence smoking status, maternal weight gain, and gestational age.    
 
 ## b
 
